@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-06-03T06:26:06.352Z",
+  "postcards": [],
+  "districtImgs": {},
+  "postcardImgs": {
+    "black": "/postcards/black.jpg",
+    "tabby": "/postcards/tabby.jpg",
+    "calico": "/postcards/calico.jpg",
+    "orange": "/postcards/orange.jpg",
+    "white": "/postcards/white.jpg",
+    "gray": "/postcards/gray.jpg",
+    "orange_white": "/postcards/orange_white.jpg",
+    "black_white": "/postcards/black_white.jpg",
+    "white_tabby": "/postcards/white_tabby.jpg",
+    "brown_white": "/postcards/brown_white.jpg"
+  }
+}
