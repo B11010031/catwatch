@@ -1,209 +1,664 @@
-// api/stats.js
-// Vercel Serverless Function
-// 呼叫方式：GET /api/stats
-// 回傳：各區回報統計 + 明信片組合
+// api/stats.js — CSV 版本 (不需要 Notion API)
+// 資料直接內嵌，更新 CSV 後重新 push 即可
 
-const NOTION_TOKEN   = process.env.NOTION_TOKEN;
-const REPORTS_DB     = process.env.NOTION_REPORTS_DB;
-
-// ── 地標對照 ─────────────────────────────────────────────
-const LANDMARKS = {
-  '大安區': '永康街老公寓巷弄',   '信義區': '信義商圈旁靜巷',
-  '士林區': '士林夜市攤販街',     '中山區': '林森北路老眷村巷弄',
-  '松山區': '饒河夜市入口',       '大同區': '大稻埕碼頭老洋樓',
-  '中正區': '師大夜市附近巷弄',   '萬華區': '龍山寺旁香火廣場',
-  '文山區': '木柵貓空茶山梯田',   '南港區': '南港舊工廠紅磚牆',
-  '內湖區': '大湖公園荷花步道',   '北投區': '北投溫泉旁小橋',
-  '板橋區': '府中路老街廟宇群',   '三重區': '三重廟街熱鬧市集',
-  '中和區': '南勢角市場老街',     '永和區': '永和豆漿大王旁巷弄',
-  '新莊區': '新莊廟街傳統建築',   '新店區': '碧潭吊橋旁河岸',
-  '樹林區': '樹林火車站旁老街',   '鶯歌區': '鶯歌陶瓷老街',
-  '三峽區': '三峽老街紅磚拱廊',   '淡水區': '淡水老街夕照河岸',
-  '汐止區': '汐止火車站旁小巷',   '瑞芳區': '九份山城老街石階',
-  '土城區': '土城桐花公園步道',   '蘆洲區': '蘆洲老街廟埕廣場',
-  '五股區': '五股溼地水鳥保護區', '林口區': '林口台地竹林步道',
-  '深坑區': '深坑老街臭豆腐名店', '三芝區': '三芝海岸老街風車',
-  '石門區': '石門海蝕洞岩岸',     '八里區': '八里渡船頭河岸',
-  '平溪區': '平溪老街天燈節',     '金山區': '金山老街磺港漁村',
-  '萬里區': '萬里野柳奇岩海岸',   '烏來區': '烏來老街溫泉瀑布',
-};
-
-const COLOR_ZH = {
-  black:'黑貓', tabby:'虎斑貓', calico:'三花貓',
-  orange:'橘貓', white:'白貓', tuxedo:'賓士貓',
-};
-
-const POSE_DESC = {
-  '蜷縮睡覺': '蜷縮在造型特製的貓咪午休榻上深深入睡',
-  '坐著發呆': '悠閒端坐，眼神放空望向遠方',
-  '走路':     '優雅踱步，尾巴高高翹起',
-};
-
-// ── Notion query ─────────────────────────────────────────
-async function notionQuery(dbId) {
-  const results = [];
-  let cursor;
-  do {
-    const body = JSON.stringify(cursor ? { start_cursor: cursor } : {});
-    const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${NOTION_TOKEN}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
+const DATA = {
+  "ok": true,
+  "total": 135,
+  "districts": {
+    "新店區": {
+      "count": 22,
+      "colorCnt": {
+        "橘白貓": 3,
+        "虎斑貓": 7,
+        "黑貓": 2,
+        "灰貓": 1,
+        "賓士貓": 1,
+        "白貓": 6,
+        "三花貓": 2
       },
-      body,
-    });
-    const data = await res.json();
-    if (!data.results) break;
-    results.push(...data.results);
-    cursor = data.has_more ? data.next_cursor : null;
-  } while (cursor);
-  return results;
-}
-
-function getProp(page, key) {
-  const p = page.properties?.[key];
-  if (!p) return null;
-  if (p.type === 'title')        return p.title?.[0]?.plain_text ?? null;
-  if (p.type === 'rich_text')    return p.rich_text?.[0]?.plain_text ?? null;
-  if (p.type === 'select')       return p.select?.name ?? null;
-  if (p.type === 'multi_select') return p.multi_select?.map(s => s.name) ?? [];
-  if (p.type === 'number')       return p.number ?? null;
-  return null;
-}
-
-// ── 顏色中文對照 ─────────────────────────────────────────
-const COLOR_ZH_MAP = {
-  black:        '黑貓',
-  tabby:        '虎斑貓',
-  calico:       '三花貓',
-  orange:       '橘貓',
-  white:        '白貓',
-  tuxedo:       '賓士貓',
-  gray:         '灰貓',
-  orange_white: '橘白貓',
-  black_white:  '賓士貓',
-  white_tabby:  '白底虎斑',
-  brown_white:  '棕白貓',
-  tortoiseshell:'玳瑁貓',
+      "poseCnt": {
+        "蜷縮躺覺": 5,
+        "other": 7,
+        "坐著發呆": 1,
+        "走動中": 4,
+        "吃飯": 1,
+        "理毛": 4
+      },
+      "envCnt": {
+        "其他": 16,
+        "店面": 1,
+        "巷弄": 1
+      },
+      "topColor": "虎斑貓",
+      "topPose": "other",
+      "topEnv": "其他",
+      "landmark": "碧潭吊橋旁河岸"
+    },
+    "安樂區": {
+      "count": 10,
+      "colorCnt": {
+        "虎斑貓": 1,
+        "三花貓": 2,
+        "橘貓": 4,
+        "灰貓": 3
+      },
+      "poseCnt": {
+        "警覺站立": 1,
+        "蜷縮躺覺": 3,
+        "坐著發呆": 4,
+        "other": 2
+      },
+      "envCnt": {
+        "巷弄": 6,
+        "其他": 4
+      },
+      "topColor": "橘貓",
+      "topPose": "坐著發呆",
+      "topEnv": "巷弄",
+      "landmark": "安樂區老街巷弄"
+    },
+    "大安區": {
+      "count": 31,
+      "colorCnt": {
+        "灰貓": 3,
+        "玳瑁貓": 1,
+        "橘貓": 5,
+        "虎斑貓": 3,
+        "黑貓": 12,
+        "白貓": 2,
+        "橘白貓": 5
+      },
+      "poseCnt": {
+        "坐著發呆": 6,
+        "走動中": 2,
+        "蜷縮躺覺": 13,
+        "曬太陽": 4,
+        "警覺站立": 2,
+        "吃飯": 4
+      },
+      "envCnt": {
+        "騎樓下": 2,
+        "店面": 1,
+        "巷弄": 6,
+        "其他": 3
+      },
+      "topColor": "黑貓",
+      "topPose": "蜷縮躺覺",
+      "topEnv": "巷弄",
+      "landmark": "永康街老公寓巷弄"
+    },
+    "中正區": {
+      "count": 9,
+      "colorCnt": {
+        "白貓": 4,
+        "灰貓": 2,
+        "三花貓": 1,
+        "白底虎斑": 1,
+        "虎斑貓": 1
+      },
+      "poseCnt": {
+        "蜷縮躺覺": 2,
+        "曬太陽": 1,
+        "坐著發呆": 3,
+        "走動中": 1,
+        "警覺站立": 2
+      },
+      "envCnt": {
+        "騎樓下": 2,
+        "其他": 2,
+        "公園": 1,
+        "山區": 1,
+        "店面": 3
+      },
+      "topColor": "白貓",
+      "topPose": "坐著發呆",
+      "topEnv": "店面",
+      "landmark": "師大夜市附近巷弄"
+    },
+    "桃園市": {
+      "count": 22,
+      "colorCnt": {
+        "三花貓": 2,
+        "賓士貓": 2,
+        "虎斑貓": 5,
+        "白貓": 5,
+        "橘貓": 2,
+        "玳瑁貓": 1,
+        "黑貓": 1,
+        "灰貓": 3,
+        "棕白貓": 1
+      },
+      "poseCnt": {
+        "走動中": 4,
+        "蜷縮躺覺": 3,
+        "警覺站立": 2,
+        "坐著發呆": 6,
+        "other": 3,
+        "理毛": 4
+      },
+      "envCnt": {
+        "其他": 8,
+        "公園": 6,
+        "巷弄": 5
+      },
+      "topColor": "虎斑貓",
+      "topPose": "坐著發呆",
+      "topEnv": "其他",
+      "landmark": "桃園市的街道"
+    },
+    "松山區": {
+      "count": 3,
+      "colorCnt": {
+        "橘白貓": 1,
+        "白貓": 2
+      },
+      "poseCnt": {
+        "蜷縮躺覺": 1,
+        "警覺站立": 2
+      },
+      "envCnt": {
+        "其他": 2
+      },
+      "topColor": "白貓",
+      "topPose": "警覺站立",
+      "topEnv": "其他",
+      "landmark": "饒河夜市入口"
+    },
+    "新莊區": {
+      "count": 2,
+      "colorCnt": {
+        "虎斑貓": 2
+      },
+      "poseCnt": {
+        "蜷縮躺覺": 2
+      },
+      "envCnt": {
+        "其他": 1,
+        "店面": 1
+      },
+      "topColor": "虎斑貓",
+      "topPose": "蜷縮躺覺",
+      "topEnv": "其他",
+      "landmark": "新莊廟街傳統建築"
+    },
+    "中和區": {
+      "count": 9,
+      "colorCnt": {
+        "黑貓": 3,
+        "橘白貓": 1,
+        "賓士貓": 1,
+        "玳瑁貓": 1,
+        "三花貓": 2,
+        "虎斑貓": 1
+      },
+      "poseCnt": {
+        "坐著發呆": 5,
+        "蜷縮躺覺": 1,
+        "other": 1,
+        "曬太陽": 2
+      },
+      "envCnt": {
+        "公園": 4,
+        "巷弄": 2,
+        "矮牆/圍牆上": 3
+      },
+      "topColor": "黑貓",
+      "topPose": "坐著發呆",
+      "topEnv": "公園",
+      "landmark": "南勢角市場老街"
+    },
+    "連江縣": {
+      "count": 3,
+      "colorCnt": {
+        "橘貓": 1,
+        "玳瑁貓": 2
+      },
+      "poseCnt": {
+        "坐著發呆": 1,
+        "other": 2
+      },
+      "envCnt": {
+        "店面": 1,
+        "巷弄": 2
+      },
+      "topColor": "玳瑁貓",
+      "topPose": "other",
+      "topEnv": "巷弄",
+      "landmark": "馬祖老街石屋"
+    },
+    "中山區": {
+      "count": 1,
+      "colorCnt": {
+        "虎斑貓": 1
+      },
+      "poseCnt": {
+        "警覺站立": 1
+      },
+      "envCnt": {
+        "其他": 1
+      },
+      "topColor": "虎斑貓",
+      "topPose": "警覺站立",
+      "topEnv": "其他",
+      "landmark": "林森北路老眷村巷弄"
+    },
+    "仁愛區": {
+      "count": 6,
+      "colorCnt": {
+        "虎斑貓": 2,
+        "白貓": 2,
+        "黑貓": 2
+      },
+      "poseCnt": {
+        "坐著發呆": 6
+      },
+      "envCnt": {
+        "矮牆/圍牆上": 2
+      },
+      "topColor": "虎斑貓",
+      "topPose": "坐著發呆",
+      "topEnv": "矮牆/圍牆上",
+      "landmark": "仁愛區海港附近"
+    },
+    "信義區": {
+      "count": 8,
+      "colorCnt": {
+        "灰貓": 8
+      },
+      "poseCnt": {
+        "坐著發呆": 4,
+        "走動中": 3,
+        "other": 1
+      },
+      "envCnt": {
+        "巷弄": 4,
+        "其他": 3,
+        "公園": 1
+      },
+      "topColor": "灰貓",
+      "topPose": "坐著發呆",
+      "topEnv": "巷弄",
+      "landmark": "信義商圈旁靜巷"
+    },
+    "萬里區": {
+      "count": 6,
+      "colorCnt": {
+        "白底虎斑": 4,
+        "棕白貓": 2
+      },
+      "poseCnt": {
+        "走動中": 4,
+        "坐著發呆": 2
+      },
+      "envCnt": {
+        "山區": 6
+      },
+      "topColor": "白底虎斑",
+      "topPose": "走動中",
+      "topEnv": "山區",
+      "landmark": "萬里野柳奇岩海岸"
+    },
+    "大同區": {
+      "count": 3,
+      "colorCnt": {
+        "黑貓": 3
+      },
+      "poseCnt": {
+        "蜷縮躺覺": 3
+      },
+      "envCnt": {
+        "矮牆/圍牆上": 3
+      },
+      "topColor": "黑貓",
+      "topPose": "蜷縮躺覺",
+      "topEnv": "矮牆/圍牆上",
+      "landmark": "大稻埕碼頭老洋樓"
+    }
+  },
+  "postcards": [
+    {
+      "color": "orange_white",
+      "colorZh": "橘白貓",
+      "env": "其他",
+      "district": "新店區",
+      "count": 3,
+      "prompt": "新店區，一隻橘白貓悠閒坐著，場景是台灣街頭，背景是碧潭吊橋旁河岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "orange_white",
+      "colorZh": "橘白貓",
+      "env": "巷弄",
+      "district": "中和區",
+      "count": 1,
+      "prompt": "中和區，一隻橘白貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是南勢角市場老街台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tabby",
+      "colorZh": "虎斑貓",
+      "env": "其他",
+      "district": "新店區",
+      "count": 7,
+      "prompt": "新店區，一隻虎斑貓悠閒坐著，場景是台灣街頭，背景是碧潭吊橋旁河岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tabby",
+      "colorZh": "虎斑貓",
+      "env": "巷弄",
+      "district": "桃園市",
+      "count": 3,
+      "prompt": "桃園市，一隻虎斑貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tabby",
+      "colorZh": "虎斑貓",
+      "env": "矮牆/圍牆上",
+      "district": "仁愛區",
+      "count": 2,
+      "prompt": "仁愛區，一隻虎斑貓悠閒坐著，場景是矮牆圍牆上，背景是仁愛區海港附近台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tabby",
+      "colorZh": "虎斑貓",
+      "env": "店面",
+      "district": "新莊區",
+      "count": 1,
+      "prompt": "新莊區，一隻虎斑貓悠閒坐著，場景是傳統自助餐店門口，背景是新莊廟街傳統建築台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tabby",
+      "colorZh": "虎斑貓",
+      "env": "公園",
+      "district": "桃園市",
+      "count": 2,
+      "prompt": "桃園市，一隻虎斑貓悠閒坐著，場景是公園綠蔭草地，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "calico",
+      "colorZh": "三花貓",
+      "env": "巷弄",
+      "district": "安樂區",
+      "count": 2,
+      "prompt": "安樂區，一隻三花貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是安樂區老街巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "calico",
+      "colorZh": "三花貓",
+      "env": "其他",
+      "district": "桃園市",
+      "count": 2,
+      "prompt": "桃園市，一隻三花貓悠閒坐著，場景是台灣街頭，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "calico",
+      "colorZh": "三花貓",
+      "env": "公園",
+      "district": "中和區",
+      "count": 1,
+      "prompt": "中和區，一隻三花貓悠閒坐著，場景是公園綠蔭草地，背景是南勢角市場老街台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "calico",
+      "colorZh": "三花貓",
+      "env": "矮牆/圍牆上",
+      "district": "中和區",
+      "count": 1,
+      "prompt": "中和區，一隻三花貓悠閒坐著，場景是矮牆圍牆上，背景是南勢角市場老街台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "calico",
+      "colorZh": "三花貓",
+      "env": "山區",
+      "district": "中正區",
+      "count": 1,
+      "prompt": "中正區，一隻三花貓悠閒坐著，場景是台灣山區步道旁，背景是師大夜市附近巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "orange",
+      "colorZh": "橘貓",
+      "env": "巷弄",
+      "district": "大安區",
+      "count": 3,
+      "prompt": "大安區，一隻橘貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是永康街老公寓巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "orange",
+      "colorZh": "橘貓",
+      "env": "其他",
+      "district": "安樂區",
+      "count": 2,
+      "prompt": "安樂區，一隻橘貓悠閒坐著，場景是台灣街頭，背景是安樂區老街巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "orange",
+      "colorZh": "橘貓",
+      "env": "店面",
+      "district": "連江縣",
+      "count": 1,
+      "prompt": "連江縣，一隻橘貓悠閒坐著，場景是傳統自助餐店門口，背景是馬祖老街石屋台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "gray",
+      "colorZh": "灰貓",
+      "env": "其他",
+      "district": "信義區",
+      "count": 3,
+      "prompt": "信義區，一隻灰貓悠閒坐著，場景是台灣街頭，背景是信義商圈旁靜巷台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "gray",
+      "colorZh": "灰貓",
+      "env": "騎樓下",
+      "district": "大安區",
+      "count": 2,
+      "prompt": "大安區，一隻灰貓悠閒坐著，場景是台灣騎樓拱廊下，背景是永康街老公寓巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "gray",
+      "colorZh": "灰貓",
+      "env": "巷弄",
+      "district": "信義區",
+      "count": 4,
+      "prompt": "信義區，一隻灰貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是信義商圈旁靜巷台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "gray",
+      "colorZh": "灰貓",
+      "env": "公園",
+      "district": "桃園市",
+      "count": 2,
+      "prompt": "桃園市，一隻灰貓悠閒坐著，場景是公園綠蔭草地，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "white",
+      "colorZh": "白貓",
+      "env": "騎樓下",
+      "district": "中正區",
+      "count": 2,
+      "prompt": "中正區，一隻白貓悠閒坐著，場景是台灣騎樓拱廊下，背景是師大夜市附近巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "white",
+      "colorZh": "白貓",
+      "env": "其他",
+      "district": "桃園市",
+      "count": 5,
+      "prompt": "桃園市，一隻白貓悠閒坐著，場景是台灣街頭，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "white",
+      "colorZh": "白貓",
+      "env": "巷弄",
+      "district": "大安區",
+      "count": 2,
+      "prompt": "大安區，一隻白貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是永康街老公寓巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "white",
+      "colorZh": "白貓",
+      "env": "店面",
+      "district": "中正區",
+      "count": 2,
+      "prompt": "中正區，一隻白貓悠閒坐著，場景是傳統自助餐店門口，背景是師大夜市附近巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tortoiseshell",
+      "colorZh": "玳瑁貓",
+      "env": "店面",
+      "district": "大安區",
+      "count": 1,
+      "prompt": "大安區，一隻玳瑁貓悠閒坐著，場景是傳統自助餐店門口，背景是永康街老公寓巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tortoiseshell",
+      "colorZh": "玳瑁貓",
+      "env": "巷弄",
+      "district": "連江縣",
+      "count": 2,
+      "prompt": "連江縣，一隻玳瑁貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是馬祖老街石屋台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "tortoiseshell",
+      "colorZh": "玳瑁貓",
+      "env": "其他",
+      "district": "桃園市",
+      "count": 1,
+      "prompt": "桃園市，一隻玳瑁貓悠閒坐著，場景是台灣街頭，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black",
+      "colorZh": "黑貓",
+      "env": "店面",
+      "district": "新店區",
+      "count": 1,
+      "prompt": "新店區，一隻黑貓悠閒坐著，場景是傳統自助餐店門口，背景是碧潭吊橋旁河岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black",
+      "colorZh": "黑貓",
+      "env": "公園",
+      "district": "中和區",
+      "count": 3,
+      "prompt": "中和區，一隻黑貓悠閒坐著，場景是公園綠蔭草地，背景是南勢角市場老街台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black",
+      "colorZh": "黑貓",
+      "env": "巷弄",
+      "district": "大安區",
+      "count": 1,
+      "prompt": "大安區，一隻黑貓悠閒坐著，場景是台灣老巷弄磚牆邊，背景是永康街老公寓巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black",
+      "colorZh": "黑貓",
+      "env": "矮牆/圍牆上",
+      "district": "大同區",
+      "count": 3,
+      "prompt": "大同區，一隻黑貓悠閒坐著，場景是矮牆圍牆上，背景是大稻埕碼頭老洋樓台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black",
+      "colorZh": "黑貓",
+      "env": "其他",
+      "district": "新店區",
+      "count": 1,
+      "prompt": "新店區，一隻黑貓悠閒坐著，場景是台灣街頭，背景是碧潭吊橋旁河岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black_white",
+      "colorZh": "賓士貓",
+      "env": "矮牆/圍牆上",
+      "district": "中和區",
+      "count": 1,
+      "prompt": "中和區，一隻賓士貓悠閒坐著，場景是矮牆圍牆上，背景是南勢角市場老街台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black_white",
+      "colorZh": "賓士貓",
+      "env": "公園",
+      "district": "桃園市",
+      "count": 1,
+      "prompt": "桃園市，一隻賓士貓悠閒坐著，場景是公園綠蔭草地，背景是桃園市台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "black_white",
+      "colorZh": "賓士貓",
+      "env": "其他",
+      "district": "新店區",
+      "count": 1,
+      "prompt": "新店區，一隻賓士貓悠閒坐著，場景是台灣街頭，背景是碧潭吊橋旁河岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "white_tabby",
+      "colorZh": "白底虎斑",
+      "env": "山區",
+      "district": "萬里區",
+      "count": 4,
+      "prompt": "萬里區，一隻白底虎斑悠閒坐著，場景是台灣山區步道旁，背景是萬里野柳奇岩海岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "white_tabby",
+      "colorZh": "白底虎斑",
+      "env": "其他",
+      "district": "中正區",
+      "count": 1,
+      "prompt": "中正區，一隻白底虎斑悠閒坐著，場景是台灣街頭，背景是師大夜市附近巷弄台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    },
+    {
+      "color": "brown_white",
+      "colorZh": "棕白貓",
+      "env": "山區",
+      "district": "萬里區",
+      "count": 2,
+      "prompt": "萬里區，一隻棕白貓悠閒坐著，場景是台灣山區步道旁，背景是萬里野柳奇岩海岸台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格"
+    }
+  ],
+  "topUsers": [
+    {
+      "name": "555",
+      "xp": 810
+    },
+    {
+      "name": "Pei",
+      "xp": 490
+    },
+    {
+      "name": "nininana",
+      "xp": 490
+    },
+    {
+      "name": "666",
+      "xp": 450
+    },
+    {
+      "name": "555",
+      "xp": 450
+    },
+    {
+      "name": "Cynthia",
+      "xp": 320
+    },
+    {
+      "name": "pei",
+      "xp": 200
+    },
+    {
+      "name": "Pei",
+      "xp": 200
+    },
+    {
+      "name": "Xuan",
+      "xp": 180
+    },
+    {
+      "name": "yluo",
+      "xp": 170
+    }
+  ]
 };
 
-// ── 分析統計 ─────────────────────────────────────────────
-function analyze(reports) {
-  const byDist = {};
-  reports.forEach(r => {
-    if (!r.location) return;
-    const loc = r.location.replace(/臺/g, '台');
-    
-    // 優先抓區級：「台北市大安區」→「大安區」
-    // 格式：XXX市/縣 + YYY區/鎮/鄉/市
-    const distMatch = loc.match(/(?:市|縣)([^\s]+?[區鎮鄉])/);
-    // fallback: 只有縣市層級
-    const cityMatch = loc.match(/^([^\s]+?(?:市|縣))/);
-    
-    const dist = distMatch ? distMatch[1] : (cityMatch ? cityMatch[1] : null);
-    if (!dist) return;
-    if (!byDist[dist]) byDist[dist] = [];
-    byDist[dist].push(r);
-  });
-
-  const stats = {};
-  Object.entries(byDist).forEach(([dist, rows]) => {
-    const colorCnt = {}, poseCnt = {}, envCnt = {};
-    rows.forEach(r => {
-      if (r.color) {
-        const cZh = COLOR_ZH_MAP[r.color] || r.color;
-        colorCnt[cZh] = (colorCnt[cZh] || 0) + 1;
-      }
-      if (r.pose) poseCnt[r.pose] = (poseCnt[r.pose] || 0) + 1;
-      if (r.env)  envCnt[r.env]   = (envCnt[r.env]   || 0) + 1;
-    });
-    const top = obj => Object.entries(obj).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const topColorZh = top(colorCnt);  // already Chinese
-    stats[dist] = {
-      count:    rows.length,
-      colorCnt, poseCnt, envCnt,
-      topColor: topColorZh,
-      topPose:  top(poseCnt),
-      topEnv:   top(envCnt),
-      landmark: LANDMARKS[dist] || `${dist}的街道`,
-    };
-  });
-  return stats;
-}
-
-// 明信片矩陣：顏色 × 環境 → 哪個區回報最多
-function buildPostcards(reports) {
-  const matrix = {};
-  reports.forEach(r => {
-    const m = r.location?.match(/([^\s市縣]+[區鄉鎮市])/);
-    if (!m || !r.color || !r.env) return;
-    const dist = m[1].replace(/臺/g, '台');
-    if (!matrix[r.color]) matrix[r.color] = {};
-    if (!matrix[r.color][r.env]) matrix[r.color][r.env] = {};
-    matrix[r.color][r.env][dist] = (matrix[r.color][r.env][dist] || 0) + 1;
-  });
-
-  const cards = [];
-  Object.entries(matrix).forEach(([color, envs]) => {
-    Object.entries(envs).forEach(([env, dists]) => {
-      const [topDist, cnt] = Object.entries(dists).sort((a, b) => b[1] - a[1])[0] || [];
-      if (!topDist) return;
-      const colorZh = COLOR_ZH_MAP[color] || COLOR_ZH[color] || color;
-      const landmark = LANDMARKS[topDist] || topDist;
-      const ENV_DESC = {
-        '巷弄':'台灣老巷弄磚牆邊', '店面':'傳統自助餐店門口',
-        '公園':'公園綠蔭草地',     '市場':'傳統市場攤位旁',
-      };
-      cards.push({
-        color, colorZh, env, district: topDist, count: cnt,
-        prompt: `台北市${topDist}，一隻${colorZh}悠閒坐著，場景是${ENV_DESC[env]||env}，背景是${landmark}台灣老街建築，日系可愛水彩插畫，色調明亮溫暖，明信片3:2比例，貓步漫遊App插圖風格`,
-      });
-    });
-  });
-  return cards;
-}
-
-// ── Handler ──────────────────────────────────────────────
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-
-  // Cache 5 分鐘（避免每次重新載入都打 Notion API）
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-
-  if (!NOTION_TOKEN || !REPORTS_DB) {
-    return res.status(500).json({ error: '缺少環境變數 NOTION_TOKEN 或 NOTION_REPORTS_DB' });
-  }
-
-  try {
-    // 拉 Reports
-    const pages = await notionQuery(REPORTS_DB);
-    const reports = pages.map(p => ({
-      user:     getProp(p, 'user_nickname'),
-      color:    getProp(p, 'color_key'),
-      pose:     getProp(p, 'pose'),
-      env:      getProp(p, 'environment'),
-      location: getProp(p, 'Location'),
-      xp:       getProp(p, 'xp_earned'),
-    })).filter(r => r.location);
-
-    const stats    = analyze(reports);
-    const postcards = buildPostcards(reports);
-    const total    = reports.length;
-
-    return res.status(200).json({
-      ok: true,
-      total,
-      generatedAt: new Date().toISOString(),
-      districts: stats,
-      postcards,
-    });
-
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
-  }
+  res.setHeader('Cache-Control', 's-maxage=3600');
+  return res.status(200).json(DATA);
 }
