@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>地圖校正工具</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #1a1a2e; color: white; display: flex; height: 100vh; }
+
+#left { width: 320px; flex-shrink: 0; background: #16213e; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+h2 { font-size: 14px; color: #94a3b8; margin-bottom: 4px; }
+.district-btn {
+  padding: 8px 12px; border-radius: 8px; border: 1.5px solid #334155;
+  background: #1e293b; color: #cbd5e1; cursor: pointer; font-size: 13px;
+  text-align: left; transition: all .15s; display: flex; justify-content: space-between; align-items: center;
+}
+.district-btn:hover { border-color: #3b82f6; color: white; }
+.district-btn.active { border-color: #3b82f6; background: #1d4ed8; color: white; }
+.district-btn.done { border-color: #22c55e; background: #14532d; }
+.district-btn .pos { font-size: 11px; color: #64748b; }
+.district-btn.done .pos { color: #4ade80; }
+
+#output {
+  margin-top: 8px; padding: 12px; background: #0f172a; border-radius: 8px;
+  font-size: 11px; font-family: monospace; color: #4ade80;
+  white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto;
+}
+.copy-btn {
+  padding: 8px; border-radius: 8px; background: #3b82f6; color: white;
+  border: none; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%;
+}
+.copy-btn:hover { background: #1d4ed8; }
+.hint { font-size: 12px; color: #64748b; line-height: 1.5; }
+.progress { font-size: 13px; color: #fbbf24; }
+
+#right { flex: 1; position: relative; overflow: hidden; cursor: crosshair; }
+#map-img { max-width: 100%; max-height: 100%; display: block; margin: auto; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.marker {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #3b82f6; border: 2px solid white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: white;
+  pointer-events: none; z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}
+.marker.done { background: #22c55e; }
+.marker-label {
+  position: absolute; transform: translate(-50%, calc(-50% - 16px));
+  font-size: 10px; font-weight: 700; color: white;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  pointer-events: none; white-space: nowrap; z-index: 11;
+}
+#crosshair {
+  position: absolute; pointer-events: none; z-index: 20;
+  width: 20px; height: 20px; transform: translate(-50%,-50%);
+  display: none;
+}
+#crosshair::before, #crosshair::after {
+  content: ''; position: absolute; background: rgba(255,255,255,.8);
+}
+#crosshair::before { width: 1px; height: 20px; left: 50%; top: 0; }
+#crosshair::after  { width: 20px; height: 1px; left: 0; top: 50%; }
+</style>
+</head>
+<body>
+
+<div id="left">
+  <h2>🐾 地圖校正工具</h2>
+  <p class="hint">選擇左側的行政區，然後點擊右側圖片上對應的位置來標記。</p>
+  <p class="progress" id="progress">已標記：0 / 0</p>
+
+  <div id="district-list"></div>
+
+  <h2 style="margin-top:8px">輸出結果</h2>
+  <div id="output">// 點擊標記後這裡會顯示座標...</div>
+  <button class="copy-btn" onclick="copyOutput()">📋 複製座標</button>
+</div>
+
+<div id="right" id="map-area">
+  <img id="map-img" src="/public/cat_map.png" alt="cat map">
+  <div id="crosshair"></div>
+  <div id="markers"></div>
+</div>
+
+<script>
+const DISTRICTS = [
+  // 台北市
+  '中正區','大同區','中山區','松山區','大安區','萬華區','信義區','士林區','北投區','內湖區','南港區','文山區',
+  // 新北市（有數據的優先）
+  '新店區','中和區','新莊區','板橋區','三重區','蘆洲區','永和區','土城區','樹林區','三峽區',
+  '鶯歌區','汐止區','深坑區','石碇區','坪林區','烏來區','瑞芳區','平溪區','雙溪區','貢寮區',
+  '金山區','萬里區','石門區','三芝區','淡水區','八里區','林口區','泰山區','五股區',
+];
+
+let positions = {};
+let activeDistrict = null;
+let imgRect = null;
+
+// Build district list
+const list = document.getElementById('district-list');
+DISTRICTS.forEach((d, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'district-btn';
+  btn.id = 'btn-' + d;
+  btn.innerHTML = `<span>${d}</span><span class="pos" id="pos-${d}">未標記</span>`;
+  btn.onclick = () => selectDistrict(d);
+  list.appendChild(btn);
+});
+
+function selectDistrict(name) {
+  document.querySelectorAll('.district-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn-' + name);
+  if (btn) { btn.classList.add('active'); btn.scrollIntoView({ block: 'nearest' }); }
+  activeDistrict = name;
+}
+
+// Auto-select first
+selectDistrict(DISTRICTS[0]);
+
+// Map click
+const mapArea = document.getElementById('right');
+const markersDiv = document.getElementById('markers');
+
+mapArea.addEventListener('mousemove', e => {
+  const ch = document.getElementById('crosshair');
+  ch.style.display = 'block';
+  ch.style.left = e.clientX - mapArea.getBoundingClientRect().left + 'px';
+  ch.style.top  = e.clientY - mapArea.getBoundingClientRect().top  + 'px';
+});
+mapArea.addEventListener('mouseleave', () => {
+  document.getElementById('crosshair').style.display = 'none';
+});
+
+mapArea.addEventListener('click', e => {
+  if (!activeDistrict) return;
+
+  const img = document.getElementById('map-img');
+  imgRect = img.getBoundingClientRect();
+  const mapRect = mapArea.getBoundingClientRect();
+
+  // Position relative to map area
+  const px = e.clientX - mapRect.left;
+  const py = e.clientY - mapRect.top;
+
+  // Position relative to image (0-1 normalized)
+  const nx = (e.clientX - imgRect.left) / imgRect.width;
+  const ny = (e.clientY - imgRect.top)  / imgRect.height;
+
+  positions[activeDistrict] = { x: Math.round(nx * 10000) / 10000, y: Math.round(ny * 10000) / 10000, px, py };
+
+  // Update button
+  const btn = document.getElementById('btn-' + activeDistrict);
+  btn.classList.remove('active');
+  btn.classList.add('done');
+  document.getElementById('pos-' + activeDistrict).textContent = `${Math.round(nx*100)}%, ${Math.round(ny*100)}%`;
+
+  // Draw marker
+  const existing = document.getElementById('marker-' + activeDistrict);
+  if (existing) existing.remove();
+
+  const marker = document.createElement('div');
+  marker.className = 'marker done';
+  marker.id = 'marker-' + activeDistrict;
+  marker.style.left = px + 'px';
+  marker.style.top  = py + 'px';
+  markersDiv.appendChild(marker);
+
+  const label = document.createElement('div');
+  label.className = 'marker-label';
+  label.style.left = px + 'px';
+  label.style.top  = py + 'px';
+  label.textContent = activeDistrict;
+  markersDiv.appendChild(label);
+
+  // Auto next
+  const idx = DISTRICTS.indexOf(activeDistrict);
+  if (idx < DISTRICTS.length - 1) selectDistrict(DISTRICTS[idx + 1]);
+
+  updateOutput();
+  updateProgress();
+});
+
+function updateProgress() {
+  const done = Object.keys(positions).length;
+  document.getElementById('progress').textContent = `已標記：${done} / ${DISTRICTS.length}`;
+}
+
+function updateOutput() {
+  const lines = Object.entries(positions)
+    .map(([name, p]) => `  '${name}': { x: ${p.x}, y: ${p.y} },`)
+    .join('\n');
+  document.getElementById('output').textContent = `const MAP_POSITIONS = {\n${lines}\n};`;
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(document.getElementById('output').textContent)
+    .then(() => alert('✅ 已複製！貼到 site.html 的對應位置'));
+}
+</script>
+</body>
+</html>
