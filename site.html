@@ -575,7 +575,7 @@ d3.json(TOPO_URL).then(topo => {
       selectDistrict(getTownName(f));
     });
 
-  // Store globally for selectDistrict
+  // Store globally for selectDistrict + data reload
   window._mapPath = path;
   window._mapFeatures = usedFeatures;
 
@@ -783,8 +783,128 @@ function doShare(){
   else navigator.clipboard.writeText(location.href).then(()=>alert('連結已複製！'));
 }
 
-buildColorTabs();
-renderPC();
+// ── 啟動：從 /api/stats 拉真實數據 ─────────────────────
+async function loadStats() {
+  try {
+    const res  = await fetch('/api/stats');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+
+    // 更新總回報數
+    document.getElementById('stat-total').textContent = data.total + ' 筆';
+
+    // 把 API 回傳的各區統計合併進 DD
+    Object.entries(data.districts).forEach(([name, s]) => {
+      if (DD[name]) {
+        DD[name].count    = s.count;
+        DD[name].colors   = s.colorCnt  || {};
+        DD[name].poses    = Object.keys(s.poseCnt || {}).sort((a,b)=>(s.poseCnt[b]||0)-(s.poseCnt[a]||0));
+        DD[name].envs     = s.envCnt    || {};
+        DD[name].topColor = s.topColor;
+        DD[name].topPose  = s.topPose;
+        DD[name].topEnv   = s.topEnv;
+        if (s.landmark) DD[name].landmark = s.landmark;
+      }
+    });
+
+    // 更新明信片資料
+    if (data.postcards?.length) {
+      POSTCARDS.length = 0;
+      data.postcards.forEach((p, i) => {
+        POSTCARDS.push({
+          id: i,
+          color:    p.color,
+          colorZh:  p.colorZh,
+          env:      p.env,
+          envKey:   p.env,
+          district: p.district,
+          pose:     p.pose || '坐著發呆',
+          count:    p.count,
+          img:      p.img || null,
+          prompt:   p.prompt,
+        });
+      });
+    }
+
+    // 重新渲染地圖顏色（D3 已經畫好，只需更新填色）
+    if (window._mapPath && window._mapFeatures) {
+      d3.selectAll('.d-path').each(function() {
+        const name = this.dataset.name;
+        if (!name) return;
+        // 重新填色
+        d3.select(this).select('rect').attr('fill', distFill(name));
+        // 更新 count bubble
+      });
+      // 重新畫 label & bubble（最簡單的方式：重新觸發一次 map render）
+      d3.select('#label-layer').selectAll('*').remove();
+      redrawLabels(window._mapPath, window._mapFeatures);
+    }
+
+    // 重新渲染明信片
+    buildColorTabs();
+    renderPC();
+
+    console.log('✅ 數據載入完成', data.total, '筆回報');
+
+  } catch (err) {
+    console.warn('API 載入失敗，使用預設資料:', err.message);
+    // fallback: 用 DD 裡的預設資料
+    buildColorTabs();
+    renderPC();
+  }
+}
+
+// 抽出 label/bubble 繪製成獨立 function
+function redrawLabels(path, features) {
+  const labelG = d3.select('#label-layer');
+  features.forEach(f => {
+    const name = getTownName(f);
+    if (!name) return;
+    const dd     = DD[name] || {};
+    const bounds = path.bounds(f);
+    const cx = (bounds[0][0] + bounds[1][0]) / 2;
+    const cy = (bounds[0][1] + bounds[1][1]) / 2;
+    const bw = bounds[1][0] - bounds[0][0];
+    const bh = bounds[1][1] - bounds[0][1];
+
+    if (dd.count > 0) {
+      const topC = Object.entries(dd.colors || {}).sort((a,b)=>b[1]-a[1])[0]?.[0];
+      const emj  = COLORS[topC]?.emoji || '🐱';
+      const fs   = Math.max(Math.min(bw, bh) * 0.3, 14);
+      labelG.append('text')
+        .attr('x', cx).attr('y', cy - 8)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+        .attr('font-size', fs).attr('pointer-events', 'none').attr('opacity', .5)
+        .text(emj);
+      const pill = labelG.append('g');
+      pill.append('rect')
+        .attr('x', cx-13).attr('y', cy+fs*.3).attr('width', 26).attr('height', 17)
+        .attr('rx', 8).attr('fill', '#1B3A6B').attr('opacity', .88);
+      pill.append('text')
+        .attr('x', cx).attr('y', cy+fs*.3+8.5)
+        .attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('font-size', 10).attr('font-weight', '700').attr('fill', 'white')
+        .attr('font-family', 'sans-serif').attr('pointer-events', 'none')
+        .text(dd.count);
+    }
+  });
+
+  // district name labels
+  labelG.selectAll('text.d-label').data(features).join('text')
+    .attr('class', d => 'd-label')
+    .attr('transform', d => 'translate(' + path.centroid(d) + ')')
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => (DD[getTownName(d)]?.count > 0) ? '-20px' : '0.35em')
+    .attr('font-size', 10.5).attr('font-weight', '600').attr('pointer-events', 'none')
+    .attr('paint-order', 'stroke')
+    .attr('fill',   d => (DD[getTownName(d)]?.count >= 4) ? 'white' : 'var(--navy)')
+    .attr('stroke', d => (DD[getTownName(d)]?.count >= 4) ? 'rgba(0,0,0,.3)' : 'rgba(255,255,255,.7)')
+    .attr('stroke-width', 2.5)
+    .text(d => getTownName(d));
+}
+
+loadStats();
+
 window.addEventListener('resize',()=>{
   document.getElementById('map-svg').setAttribute('width',window.innerWidth);
   document.getElementById('map-svg').setAttribute('height',window.innerHeight-60);
