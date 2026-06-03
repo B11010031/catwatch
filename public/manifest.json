@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-03T06:26:06.352Z",
+  "generatedAt": "2026-06-03T07:23:23.800Z",
   "postcards": [],
   "districtImgs": {},
   "postcardImgs": {
@@ -12,6 +12,7 @@
     "orange_white": "/postcards/orange_white.jpg",
     "black_white": "/postcards/black_white.jpg",
     "white_tabby": "/postcards/white_tabby.jpg",
-    "brown_white": "/postcards/brown_white.jpg"
+    "brown_white": "/postcards/brown_white.jpg",
+    "tortoiseshell": "/postcards/tortoiseshell.jpg"
   }
 }

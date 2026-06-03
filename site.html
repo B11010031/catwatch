@@ -56,14 +56,51 @@ header{
 /* ══════════════════════
    MAP PAGE
 ══════════════════════ */
-#map-root{width:100%;height:100%;position:relative;cursor:grab}
-#map-root:active{cursor:grabbing}
-#map-svg{width:100%;height:100%;display:block}
+#map-root{width:100%;height:100%;position:relative;cursor:default;overflow:hidden;background:#87CEEB}
+#map-svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-.d-path{transition:filter .15s;cursor:pointer}
-.d-border{fill:none;stroke:rgba(255,255,255,.65);stroke-width:1.8px;pointer-events:none}
-.d-hit{fill:transparent;stroke:transparent;stroke-width:2px;cursor:pointer}
-.d-label{font-family:'Noto Sans TC',sans-serif;font-size:10.5px;font-weight:600;pointer-events:none;paint-order:stroke;stroke-width:2.5px}
+/* 底圖容器 */
+#map-bg{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+#map-bg img{
+  height:100%;width:100%;
+  object-fit:contain;
+  transform-origin:center center;
+  transition:transform .1s ease-out;
+  pointer-events:none;
+  user-select:none;
+}
+
+.d-hit{
+  fill:transparent;
+  stroke:transparent;
+  stroke-width:3px;
+  cursor:pointer;
+  transition:fill .15s;
+}
+.d-hit:hover{
+  fill:rgba(255,255,255,.18);
+  stroke:rgba(255,255,255,.7);
+  stroke-width:2px;
+}
+.d-hit.active{
+  fill:rgba(255,255,255,.28);
+  stroke:rgba(255,255,255,.9);
+  stroke-width:2.5px;
+}
+.d-label{
+  font-family:'Noto Sans TC',sans-serif;
+  font-size:11px;font-weight:700;
+  pointer-events:none;
+  paint-order:stroke;
+  stroke-width:3px;
+  fill:white;
+  stroke:rgba(0,0,0,.5);
+}
+.d-label.dark{fill:var(--navy);stroke:rgba(255,255,255,.8)}
 
 #map-toolbar{position:absolute;top:14px;right:14px;display:flex;flex-direction:column;gap:6px;z-index:10}
 .t-btn{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.92);border:1px solid var(--border);font-size:17px;cursor:pointer;color:var(--text-2);display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-sm);transition:all .15s}
@@ -205,11 +242,16 @@ header{
 <!-- MAP PAGE -->
 <div id="page-map" class="page active">
   <div id="map-root">
+    <!-- 底圖：貓咪插畫地圖 -->
+    <div id="map-bg">
+      <img id="map-img" src="/public/cat_map.png" alt="台北貓版圖" draggable="false">
+    </div>
+    <!-- D3 SVG overlay：透明互動層 -->
     <svg id="map-svg"></svg>
 
     <div id="map-loading">
       <div class="spin"></div>
-      <p style="font-size:13px;color:var(--text-2)">載入台北市地圖...</p>
+      <p style="font-size:13px;color:var(--text-2)">載入貓版圖...</p>
     </div>
 
     <div id="map-toolbar">
@@ -399,282 +441,197 @@ function showPage(id, btn){
 /* ═══════════════════════════════════════
    MAP — real TopoJSON from taiwan-atlas
 ═══════════════════════════════════════ */
-let selDistrict=null, zoomBeh;
+/* ═══════════════════════════════════════════
+   MAP — 底圖 + D3 SVG overlay
+═══════════════════════════════════════════ */
+let selDistrict = null;
+let currentScale = 1;
+let translateX = 0, translateY = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0, dragStartTX = 0, dragStartTY = 0;
 
-const W = window.innerWidth, H = window.innerHeight-60;
-const svg  = d3.select('#map-svg').attr('width',W).attr('height',H);
-const defs = svg.append('defs');
+const mapRoot = document.getElementById('map-root');
+const mapImg  = document.getElementById('map-img');
+const W = window.innerWidth;
+const H = window.innerHeight - 60;
 
-// Subtle bg gradient
-const bgG = defs.append('radialGradient').attr('id','bg-g').attr('cx','50%').attr('cy','50%').attr('r','75%');
-bgG.append('stop').attr('offset','0%').attr('stop-color','#CBE0F8');
-bgG.append('stop').attr('offset','100%').attr('stop-color','#B8D0EF');
-svg.append('rect').attr('width',W).attr('height',H).attr('fill','url(#bg-g)');
+const svg = d3.select('#map-svg')
+  .attr('width', W).attr('height', H)
+  .style('position','absolute').style('inset','0')
+  .style('pointer-events','all');
 
-const g      = svg.append('g').attr('id','zoom-g');
-const baseG  = g.append('g');
-const borderG= g.append('g');
-const labelG = g.append('g');
-const hitG   = g.append('g');
-
-function distFill(name){
-  const d = DD[name];
-  const isNTP = d?.city==='新北市';
-  if(!d||!d.count) return isNTP ? '#E0F2FE' : '#DBEAFE';
-  // 台北: navy scale, 新北: teal scale
-  if(isNTP){
-    if(d.count>=4) return '#0F766E';
-    if(d.count>=2) return '#14B8A6';
-    return '#99F6E4';
-  }
-  if(d.count>=4) return '#1B3A6B';
-  if(d.count>=2) return '#3B82F6';
-  return '#93C5FD';
-}
+const proj = d3.geoMercator()
+  .center([121.549, 25.055])
+  .scale(H * 210)
+  .translate([W * 0.50, H * 0.52]);
+const pathGen = d3.geoPath(proj);
 
 const tip = document.getElementById('map-tip');
+const hitG   = svg.append('g').attr('id','hit-layer');
+const labelG = svg.append('g').attr('id','label-layer');
 
-// Fetch real Taiwan TopoJSON → filter Taipei districts
+// ── Zoom & Pan ───────────────────────────────────────
+function applyTransform() {
+  // Apply to both image and SVG overlay
+  const t = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+  mapImg.style.transform = t;
+  svg.style('transform', t);
+  svg.style('transform-origin', 'center center');
+}
+
+// Mouse wheel zoom
+mapRoot.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  currentScale = Math.max(0.5, Math.min(8, currentScale * delta));
+  applyTransform();
+}, { passive: false });
+
+// Drag pan
+mapRoot.addEventListener('mousedown', e => {
+  if (e.target.classList.contains('d-hit')) return;
+  isDragging = true;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  dragStartTX = translateX; dragStartTY = translateY;
+  mapRoot.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  translateX = dragStartTX + (e.clientX - dragStartX);
+  translateY = dragStartTY + (e.clientY - dragStartY);
+  applyTransform();
+});
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  mapRoot.style.cursor = 'default';
+});
+
+// Touch zoom & pan
+let lastTouchDist = null;
+mapRoot.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    lastTouchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  } else if (e.touches.length === 1) {
+    isDragging = true;
+    dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+    dragStartTX = translateX; dragStartTY = translateY;
+  }
+}, { passive: true });
+mapRoot.addEventListener('touchmove', e => {
+  if (e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    if (lastTouchDist) {
+      currentScale = Math.max(0.5, Math.min(8, currentScale * (dist / lastTouchDist)));
+      applyTransform();
+    }
+    lastTouchDist = dist;
+  } else if (isDragging && e.touches.length === 1) {
+    translateX = dragStartTX + (e.touches[0].clientX - dragStartX);
+    translateY = dragStartTY + (e.touches[0].clientY - dragStartY);
+    applyTransform();
+  }
+}, { passive: true });
+mapRoot.addEventListener('touchend', () => { isDragging = false; lastTouchDist = null; });
+
+// ── District hit areas ───────────────────────────────
+function getTownName(f) {
+  return f.properties.TOWNNAME || f.properties.townName || f.properties.name || '';
+}
+
 const TOPO_URL = 'https://cdn.jsdelivr.net/npm/taiwan-atlas@1.0.0/towns-10t.json';
 
 d3.json(TOPO_URL).then(topo => {
-  // taiwan-atlas towns object key
   const key = Object.keys(topo.objects)[0];
   const allFeatures = topojson.feature(topo, topo.objects[key]).features;
 
-  // 台北市(63) + 新北市(65) — 大台北地區
-  const COUNTY_CODES = new Set(['63','65']);
   const COUNTY_NAMES = ['台北','臺北','新北'];
-
   const features = allFeatures.filter(f => {
     const county = f.properties.COUNTYNAME || f.properties.countyName || '';
     const cid    = String(f.properties.COUNTYID || f.properties.countyId || '');
-    return COUNTY_NAMES.some(n => county.includes(n)) || COUNTY_CODES.has(cid);
+    return COUNTY_NAMES.some(n => county.includes(n)) || ['63','65'].includes(cid);
   });
 
-  // fallback: match by known district names in DD
-  const distNames = new Set(Object.keys(DD));
-  const finalFeatures = features.length >= 20 ? features :
+  const usedFeatures = features.length >= 10 ? features :
     allFeatures.filter(f => {
       const t = f.properties.TOWNNAME || f.properties.townName || f.properties.name || '';
-      return [...distNames].some(d => t.includes(d.replace(/[區市鄉鎮]/g,'')));
+      return Object.keys(DD).some(d => t.includes(d.replace(/[區市鄉鎮]/g,'')));
     });
-  const usedFeatures = finalFeatures.length >= 10 ? finalFeatures : features.length ? features : allFeatures.slice(0,50);
 
-  if(!usedFeatures.length){ showFallback(); return; }
-
-  // Project to fit viewport
-  const proj = d3.geoMercator().fitExtent([[40,40],[W-40,H-40]], {type:'FeatureCollection',features:usedFeatures});
-  const path = d3.geoPath(proj);
-
-  // clipPaths
-  features.forEach(f=>{
-    const name = getTownName(f);
-    if(!name) return;
-    const safe = name.replace(/\W/g,'_');
-    defs.append('clipPath').attr('id','clip_'+safe).append('path').attr('d',path(f));
-  });
-
-  // Draw fills
-  usedFeatures.forEach(f=>{
-    const name = getTownName(f);
-    if(!name) return;
-    const safe   = name.replace(/\W/g,'_');
-    const dd     = DD[name]||{};
-    const bounds = path.bounds(f);
-    const bx=bounds[0][0],by=bounds[0][1],bw=bounds[1][0]-bx,bh=bounds[1][1]-by;
-    const cx=(bounds[0][0]+bounds[1][0])/2, cy=(bounds[0][1]+bounds[1][1])/2;
-
-    // ── 這裡之後換成真實圖片 ──────────────────
-    // baseG.append('image')
-    //   .attr('clip-path','url(#clip_'+safe+')')
-    //   .attr('href',`/public/maps/${safe}.jpg`)
-    //   .attr('x',bx-4).attr('y',by-4)
-    //   .attr('width',bw+8).attr('height',bh+8)
-    //   .attr('preserveAspectRatio','xMidYMid slice');
-    // ──────────────────────────────────────────
-
-    // Colour fill (placeholder until images ready)
-    const pg = baseG.append('g').attr('class','d-path').attr('data-name',name)
-      .attr('clip-path','url(#clip_'+safe+')');
-    pg.append('rect').attr('x',bx-2).attr('y',by-2).attr('width',bw+4).attr('height',bh+4)
-      .attr('fill',distFill(name));
-    // subtle inner gradient
-    const tId='t_'+safe;
-    const tg=defs.append('linearGradient').attr('id',tId).attr('x1','0%').attr('y1','0%').attr('x2','50%').attr('y2','100%');
-    tg.append('stop').attr('offset','0%').attr('stop-color','rgba(255,255,255,.2)');
-    tg.append('stop').attr('offset','100%').attr('stop-color','rgba(0,0,0,.1)');
-    pg.append('path').attr('d',path(f)).attr('fill','url(#'+tId+')');
-
-    // emoji + count for districts with data
-    if(dd.count>0){
-      const topC = Object.entries(dd.colors).sort((a,b)=>b[1]-a[1])[0]?.[0];
-      const emj  = COLORS[topC]?.emoji||'🐱';
-      const fs   = Math.max(Math.min(bw,bh)*0.3,14);
-      labelG.append('text')
-        .attr('x',cx).attr('y',cy-8).attr('text-anchor','middle').attr('dominant-baseline','middle')
-        .attr('font-size',fs).attr('pointer-events','none').attr('opacity',.5).text(emj);
-      // count pill
-      const pill = labelG.append('g');
-      pill.append('rect').attr('x',cx-13).attr('y',cy+fs*.3).attr('width',26).attr('height',17)
-        .attr('rx',8).attr('fill','#1B3A6B').attr('opacity',.88);
-      pill.append('text').attr('x',cx).attr('y',cy+fs*.3+8.5)
-        .attr('text-anchor','middle').attr('dominant-baseline','middle')
-        .attr('font-size',10).attr('font-weight','700').attr('fill','white')
-        .attr('font-family','sans-serif').attr('pointer-events','none').text(dd.count);
-    }
-  });
-
-  // White borders
-  borderG.selectAll('path').data(usedFeatures).join('path')
-    .attr('class','d-border').attr('d',path);
-
-  // District name labels
-  labelG.selectAll('text.d-label').data(usedFeatures).join('text')
-    .attr('class','d-label')
-    .attr('transform',f=>'translate('+path.centroid(f)+')')
-    .attr('text-anchor','middle')
-    .attr('dy', f => (DD[getTownName(f)]?.count>0)?'-20px':'0.35em')
-    .attr('font-size',10.5).attr('font-weight','600').attr('pointer-events','none')
-    .attr('paint-order','stroke')
-    .attr('fill', f => (DD[getTownName(f)]?.count>=4)?'white':'var(--navy)')
-    .attr('stroke', f => (DD[getTownName(f)]?.count>=4)?'rgba(0,0,0,.3)':'rgba(255,255,255,.7)')
-    .attr('stroke-width',2.5)
-    .text(f => getTownName(f));
-
-  // Hit areas
-  hitG.selectAll('path').data(usedFeatures).join('path')
-    .attr('class','d-hit').attr('d',path)
-    .on('mousemove', function(event,f){
-      const name=getTownName(f); const dd=DD[name]||{};
-      const topC=Object.entries(dd.colors||{}).sort((a,b)=>b[1]-a[1])[0];
-      const rect=document.getElementById('map-root').getBoundingClientRect();
-      const cityTag = DD[name]?.city==='新北市'?'新北市·':'台北市·';
+  // Hit areas (transparent, hover highlight)
+  hitG.selectAll('path.d-hit')
+    .data(usedFeatures)
+    .join('path')
+    .attr('class','d-hit')
+    .attr('d', pathGen)
+    .on('mousemove', function(event, f) {
+      const name = getTownName(f);
+      const dd   = DD[name] || {};
+      const topC = Object.entries(dd.colors||{}).sort((a,b)=>b[1]-a[1])[0];
+      const rect = mapRoot.getBoundingClientRect();
       document.getElementById('tt-name').textContent  = name;
-      document.getElementById('tt-name').setAttribute('data-city', DD[name]?.city||'');
-      document.getElementById('tt-count').textContent = (dd.count||0)+' 筆';
-      document.getElementById('tt-color').textContent = topC?topC[0]:'—';
-      document.getElementById('tt-pose').textContent  = (dd.poses||[])[0]||'—';
-      tip.style.left=Math.min(event.clientX-rect.left+14,W-180)+'px';
-      tip.style.top =Math.max(event.clientY-rect.top-70,10)+'px';
+      document.getElementById('tt-count').textContent = (dd.count||0) + ' 筆';
+      document.getElementById('tt-color').textContent = topC ? topC[0] : '—';
+      document.getElementById('tt-pose').textContent  = (dd.poses||[])[0] || '—';
+      tip.style.left = Math.min(event.clientX - rect.left + 14, W - 200) + 'px';
+      tip.style.top  = Math.max(event.clientY - rect.top  - 70, 10) + 'px';
       tip.classList.add('show');
-      baseG.selectAll('.d-path').each(function(){
-        if(this.dataset.name===name && this.dataset.name!==selDistrict)
-          d3.select(this).style('filter','brightness(1.1)');
-      });
     })
-    .on('mouseleave',function(event,f){
+    .on('mouseleave', function() {
       tip.classList.remove('show');
-      const name=getTownName(f);
-      if(name!==selDistrict)
-        baseG.selectAll('.d-path').filter(function(){ return this.dataset.name===name; })
-          .style('filter','');
     })
-    .on('click',function(event,f){
+    .on('click', function(event, f) {
       event.stopPropagation();
-      selectDistrict(getTownName(f));
+      const name = getTownName(f);
+      hitG.selectAll('.d-hit').classed('active', false);
+      d3.select(this).classed('active', true);
+      selDistrict = name;
+      fillPanel(name);
+      document.getElementById('side-panel').classList.add('open');
     });
 
-  // Store globally for selectDistrict + data reload
-  window._mapPath = path;
-  window._mapFeatures = usedFeatures;
+  // District labels
+  labelG.selectAll('text.d-label')
+    .data(usedFeatures)
+    .join('text')
+    .attr('class', f => 'd-label' + ((!DD[getTownName(f)]?.count) ? ' dark' : ''))
+    .attr('transform', f => 'translate(' + pathGen.centroid(f) + ')')
+    .attr('text-anchor','middle').attr('dy','0.35em')
+    .attr('font-size', 10).attr('font-weight','700')
+    .attr('pointer-events','none')
+    .attr('paint-order','stroke')
+    .attr('fill', f => DD[getTownName(f)]?.count >= 3 ? 'white' : 'rgba(255,255,255,0.9)')
+    .attr('stroke','rgba(0,0,0,.45)').attr('stroke-width', 2.5)
+    .text(f => getTownName(f));
 
   // Hide loading
   const ml = document.getElementById('map-loading');
-  ml.classList.add('hidden');
-  setTimeout(()=>ml.style.display='none',500);
+  ml.style.opacity = '0';
+  setTimeout(() => ml.style.display='none', 400);
 
-  // Zoom
-  zoomBeh = d3.zoom().scaleExtent([0.5,10]).on('zoom',e=>g.attr('transform',e.transform));
-  svg.call(zoomBeh);
-  svg.on('click',()=>{ if(selDistrict) closePanel(); });
+  window._mapPath = pathGen;
+  window._mapFeatures = usedFeatures;
 
-}).catch(err => {
-  console.error('TopoJSON load error:', err);
-  showFallback();
+}).catch(() => {
+  document.getElementById('map-loading').innerHTML =
+    '<p style="font-size:13px;color:var(--text-2)">地圖載入失敗，請重新整理</p>';
 });
 
-function getTownName(f){
-  return f.properties.TOWNNAME || f.properties.townName ||
-         f.properties.name     || f.properties.NAME     || '';
-}
-
-function showFallback(){
-  document.getElementById('map-loading').innerHTML =
-    '<p style="font-size:13px;color:var(--text-2);text-align:center;padding:20px">地圖載入失敗<br><small style="color:var(--text-3)">請確認網路連線後重新整理</small></p>';
-}
-
-function selectDistrict(name){
-  const path=window._mapPath, features=window._mapFeatures;
-  if(!DD[name]) return;
-  if(selDistrict===name){ closePanel(); return; }
-  selDistrict = name;
-
-  baseG.selectAll('.d-path').each(function(){
-    d3.select(this).style('filter', this.dataset.name===name ? 'brightness(1.1)' : 'brightness(.65) saturate(.5)');
-  });
-
-  fillPanel(name);
-  document.getElementById('side-panel').classList.add('open');
-
-  if(path && features){
-    const feat = features.find(f=>getTownName(f)===name);
-    if(feat){
-      const c = path.centroid(feat);
-      svg.transition().duration(480).call(zoomBeh.translateBy, W*.58-c[0], H*.5-c[1]);
-    }
+svg.on('click', () => {
+  if (selDistrict) {
+    selDistrict = null;
+    hitG.selectAll('.d-hit').classed('active', false);
+    closePanel();
   }
-}
+});
 
-function closePanel(){
-  selDistrict=null;
-  document.getElementById('side-panel').classList.remove('open');
-  baseG.selectAll('.d-path').style('filter','');
-}
-
-function fillPanel(name){
-  const dd=DD[name]||{};
-  const topC=Object.entries(dd.colors||{}).sort((a,b)=>b[1]-a[1])[0]?.[0];
-  const col  = COLORS[topC];
-  document.getElementById('sp-emoji').textContent = col?.emoji||'🐾';
-  document.getElementById('sp-hint').textContent  = dd.count ? `${dd.count} 筆回報` : '尚無回報';
-  document.getElementById('sp-hero').style.background = dd.count&&col ? col.light : 'var(--blue-light)';
-  // real img: document.getElementById('sp-img').src=`/public/maps/${name}.jpg`; sp-img.style.display='block';
-  document.getElementById('sp-name').textContent = name;
-  document.getElementById('sp-meta').textContent = dd.count
-    ? `共 ${dd.count} 筆 · 最多：${topC||'—'} · ${dd.landmark}`
-    : '尚無回報資料 · '+dd.landmark;
-
-  const maxB=Math.max(...Object.values(dd.colors||{}).concat(1));
-  document.getElementById('sp-bars').innerHTML = Object.entries(dd.colors||{}).length
-    ? Object.entries(dd.colors).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`
-        <div class="bar-row">
-          <span class="bar-lbl">${c}</span>
-          <span class="bar-trk"><span class="bar-fill" style="width:${Math.round(n/maxB*100)}%;background:${COLORS[c]?.hex||'#94A3B8'}"></span></span>
-          <span class="bar-num">${n}</span>
-        </div>`).join('')
-    : '<div style="font-size:12px;color:var(--text-3)">暫無資料</div>';
-
-  document.getElementById('sp-poses').innerHTML =
-    (dd.poses||[]).map(p=>`<span class="badge bd-navy">${p}</span>`).join('')||
-    '<span class="badge bd-gray">暫無</span>';
-
-  const maxE=Math.max(...Object.values(dd.envs||{}).concat(1));
-  document.getElementById('sp-envs').innerHTML = Object.entries(dd.envs||{}).length
-    ? Object.entries(dd.envs).sort((a,b)=>b[1]-a[1]).map(([e,n])=>`
-        <div class="bar-row">
-          <span class="bar-lbl">${e}</span>
-          <span class="bar-trk"><span class="bar-fill" style="width:${Math.round(n/maxE*100)}%;background:var(--blue)"></span></span>
-          <span class="bar-num">${n}</span>
-        </div>`).join('')
-    : '<div style="font-size:12px;color:var(--text-3)">暫無資料</div>';
-
-  document.getElementById('sp-prompt-txt').textContent = buildPrompt(name,dd);
-}
-
-function zoomIn()   { svg.transition().call(zoomBeh.scaleBy,1.5); }
-function zoomOut()  { svg.transition().call(zoomBeh.scaleBy,.67); }
-function zoomReset(){ svg.transition().duration(600).call(zoomBeh.transform,d3.zoomIdentity); }
+function zoomIn()    { currentScale = Math.min(8, currentScale * 1.4); applyTransform(); }
+function zoomOut()   { currentScale = Math.max(0.5, currentScale * 0.7); applyTransform(); }
+function zoomReset() { currentScale = 1; translateX = 0; translateY = 0; applyTransform(); }
 
 /* ═══════════════════════════════════════
    POSTCARDS — 顏色分類
