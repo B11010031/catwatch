@@ -170,11 +170,11 @@ header{
 .pc-btn.primary:hover{background:var(--blue-dark)}
 
 /* lightbox */
-#lb{position:fixed;inset:0;z-index:200;background:rgba(10,20,50,.82);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+#lb{position:fixed;inset:0;z-index:200;background:rgba(5,10,30,.92);backdrop-filter:blur(16px);display:none;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
 #lb.show{display:flex}
-.lb-box{background:white;border-radius:var(--r-lg);max-width:600px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:var(--sh-lg);position:relative}
-.lb-img{height:320px;background:var(--blue-light);border-radius:var(--r-lg) var(--r-lg) 0 0;overflow:hidden}
-.lb-img img{width:100%;height:100%;object-fit:cover;display:block}
+.lb-box{background:white;border-radius:var(--r-lg);max-width:860px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:var(--sh-lg);position:relative}
+.lb-img{height:520px;background:var(--blue-light);border-radius:var(--r-lg) var(--r-lg) 0 0;overflow:hidden}
+.lb-img img{width:100%;height:100%;object-fit:contain;display:block;background:#000}
 .lb-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.85);border:none;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
 .lb-body{padding:20px 24px 24px}
 .lb-title{font-size:20px;font-weight:700;color:var(--navy);margin-bottom:3px}
@@ -712,7 +712,8 @@ function buildColorTabs(){
       btn.innerHTML = `全部 <span class="badge bd-navy" style="margin-left:4px">${POSTCARDS.length}</span>`;
     } else {
       const col = COLORS[c]||{hex:'#94A3B8',light:'#F1F5F9',emoji:'🐾'};
-      btn.innerHTML = `<span class="ctab-dot" style="background:${col.hex}"></span>${c}
+      const labelZh = {'black':'黑貓','tabby':'虎斑貓','calico':'三花貓','orange':'橘貓','white':'白貓','gray':'灰貓','orange_white':'橘白貓','black_white':'黑白貓','white_tabby':'白底虎斑','brown_white':'棕白貓','tortoiseshell':'玳瑁貓'}[c]||c;
+      btn.innerHTML = `<span class="ctab-dot" style="background:${col.hex}"></span>${labelZh}
         <span class="badge" style="margin-left:4px;background:${col.light};color:${col.hex}">${counts[c]}</span>`;
     }
     row.appendChild(btn);
@@ -744,13 +745,12 @@ function renderPC(){
       <div class="pc-info">
         <div class="pc-name">
           <span class="pc-color-dot" style="background:${c.hex}"></span>
-          ${p.color} · ${p.env}
+          ${p.colorZh} · ${p.district}
         </div>
-        <div class="pc-meta">基於 ${p.count} 筆回報 · ${p.district}</div>
+        <div class="pc-meta">共 ${p.count} 筆回報</div>
         <div class="pc-tags">
-          <span class="badge" style="background:${c.light};color:${c.hex}">${p.color}</span>
-          <span class="badge bd-navy">${p.env}</span>
-          <span class="badge bd-gray">${p.pose}</span>
+          <span class="badge" style="background:${c.light};color:${c.hex}">${p.colorZh}</span>
+          <span class="badge bd-navy">${p.district}</span>
         </div>
       </div>
       <div class="pc-acts">
@@ -767,8 +767,8 @@ function openLb(id){
   document.getElementById('lb-img').src = p.img||'';
   document.getElementById('lb-img').style.display = p.img?'block':'none';
   document.getElementById('lb-img-wrap').style.background = c.light||'var(--blue-light)';
-  document.getElementById('lb-title').textContent = `${p.color} · ${p.env}`;
-  document.getElementById('lb-sub').textContent   = `${p.district} · ${p.pose} · 基於 ${p.count} 筆回報`;
+  document.getElementById('lb-title').textContent = `${p.colorZh} · ${p.district}`;
+  document.getElementById('lb-sub').textContent   = `共 ${p.count} 筆回報`;
   document.getElementById('lb-prompt').textContent = p.prompt;
   document.getElementById('lb').classList.add('show');
 }
