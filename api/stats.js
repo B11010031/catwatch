@@ -73,13 +73,37 @@ function getProp(page, key) {
   return null;
 }
 
+// ── 顏色中文對照 ─────────────────────────────────────────
+const COLOR_ZH_MAP = {
+  black:        '黑貓',
+  tabby:        '虎斑貓',
+  calico:       '三花貓',
+  orange:       '橘貓',
+  white:        '白貓',
+  tuxedo:       '賓士貓',
+  gray:         '灰貓',
+  orange_white: '橘白貓',
+  black_white:  '賓士貓',
+  white_tabby:  '白底虎斑',
+  brown_white:  '棕白貓',
+  tortoiseshell:'玳瑁貓',
+};
+
 // ── 分析統計 ─────────────────────────────────────────────
 function analyze(reports) {
   const byDist = {};
   reports.forEach(r => {
-    const m = r.location?.match(/([^\s市縣]+[區鄉鎮市])/);
-    if (!m) return;
-    const dist = m[1].replace(/臺/g, '台');
+    if (!r.location) return;
+    const loc = r.location.replace(/臺/g, '台');
+    
+    // 優先抓區級：「台北市大安區」→「大安區」
+    // 格式：XXX市/縣 + YYY區/鎮/鄉/市
+    const distMatch = loc.match(/(?:市|縣)([^\s]+?[區鎮鄉])/);
+    // fallback: 只有縣市層級
+    const cityMatch = loc.match(/^([^\s]+?(?:市|縣))/);
+    
+    const dist = distMatch ? distMatch[1] : (cityMatch ? cityMatch[1] : null);
+    if (!dist) return;
     if (!byDist[dist]) byDist[dist] = [];
     byDist[dist].push(r);
   });
@@ -88,15 +112,19 @@ function analyze(reports) {
   Object.entries(byDist).forEach(([dist, rows]) => {
     const colorCnt = {}, poseCnt = {}, envCnt = {};
     rows.forEach(r => {
-      if (r.color) colorCnt[r.color] = (colorCnt[r.color] || 0) + 1;
-      if (r.pose)  poseCnt[r.pose]   = (poseCnt[r.pose]  || 0) + 1;
-      if (r.env)   envCnt[r.env]     = (envCnt[r.env]    || 0) + 1;
+      if (r.color) {
+        const cZh = COLOR_ZH_MAP[r.color] || r.color;
+        colorCnt[cZh] = (colorCnt[cZh] || 0) + 1;
+      }
+      if (r.pose) poseCnt[r.pose] = (poseCnt[r.pose] || 0) + 1;
+      if (r.env)  envCnt[r.env]   = (envCnt[r.env]   || 0) + 1;
     });
     const top = obj => Object.entries(obj).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topColorZh = top(colorCnt);  // already Chinese
     stats[dist] = {
       count:    rows.length,
       colorCnt, poseCnt, envCnt,
-      topColor: top(colorCnt),
+      topColor: topColorZh,
       topPose:  top(poseCnt),
       topEnv:   top(envCnt),
       landmark: LANDMARKS[dist] || `${dist}的街道`,
@@ -122,7 +150,7 @@ function buildPostcards(reports) {
     Object.entries(envs).forEach(([env, dists]) => {
       const [topDist, cnt] = Object.entries(dists).sort((a, b) => b[1] - a[1])[0] || [];
       if (!topDist) return;
-      const colorZh = COLOR_ZH[color] || color;
+      const colorZh = COLOR_ZH_MAP[color] || COLOR_ZH[color] || color;
       const landmark = LANDMARKS[topDist] || topDist;
       const ENV_DESC = {
         '巷弄':'台灣老巷弄磚牆邊', '店面':'傳統自助餐店門口',
