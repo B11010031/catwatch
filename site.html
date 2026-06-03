@@ -442,8 +442,53 @@ function showPage(id, btn){
    MAP — real TopoJSON from taiwan-atlas
 ═══════════════════════════════════════ */
 /* ═══════════════════════════════════════════
-   MAP — 底圖 + D3 SVG overlay
+   MAP — 底圖 + 圖片座標 overlay
 ═══════════════════════════════════════════ */
+
+// 圖片座標（用 calibrate.html 標記）
+const MAP_POSITIONS = {
+  '五股區': { x: 0.2549, y: 0.43 },
+  '泰山區': { x: 0.2451, y: 0.4777 },
+  '八里區': { x: 0.2255, y: 0.4005 },
+  '林口區': { x: 0.1549, y: 0.43 },
+  '淡水區': { x: 0.2902, y: 0.3733 },
+  '三芝區': { x: 0.3588, y: 0.3461 },
+  '石門區': { x: 0.4314, y: 0.337 },
+  '萬里區': { x: 0.4549, y: 0.362 },
+  '金山區': { x: 0.4706, y: 0.3506 },
+  '貢寮區': { x: 0.8843, y: 0.5004 },
+  '雙溪區': { x: 0.7765, y: 0.4913 },
+  '瑞芳區': { x: 0.749, y: 0.4289 },
+  '烏來區': { x: 0.3588, y: 0.6592 },
+  '坪林區': { x: 0.6078, y: 0.5753 },
+  '石碇區': { x: 0.5137, y: 0.556 },
+  '深坑區': { x: 0.4882, y: 0.5095 },
+  '汐止區': { x: 0.5373, y: 0.4573 },
+  '鶯歌區': { x: 0.1176, y: 0.5401 },
+  '三峽區': { x: 0.2098, y: 0.5877 },
+  '樹林區': { x: 0.2, y: 0.5231 },
+  '新店區': { x: 0.3765, y: 0.5639 },
+  '新莊區': { x: 0.2608, y: 0.4992 },
+  '土城區': { x: 0.251, y: 0.5412 },
+  '永和區': { x: 0.3039, y: 0.5117 },
+  '中和區': { x: 0.2824, y: 0.5299 },
+  '板橋區': { x: 0.2392, y: 0.514 },
+  '三重區': { x: 0.3137, y: 0.4652 },
+  '蘆洲區': { x: 0.3078, y: 0.4402 },
+  '文山區': { x: 0.4333, y: 0.5219 },
+  '南港區': { x: 0.4784, y: 0.4788 },
+  '內湖區': { x: 0.4569, y: 0.4402 },
+  '北投區': { x: 0.3667, y: 0.3971 },
+  '士林區': { x: 0.4196, y: 0.4164 },
+  '萬華區': { x: 0.3392, y: 0.5174 },
+  '大安區': { x: 0.3922, y: 0.4924 },
+  '中正區': { x: 0.3667, y: 0.4992 },
+  '中山區': { x: 0.3961, y: 0.4493 },
+  '松山區': { x: 0.4137, y: 0.4652 },
+  '信義區': { x: 0.4451, y: 0.4822 },
+  '大同區': { x: 0.3529, y: 0.4697 },
+  '平溪區': { x: 0.6745, y: 0.4811 },
+};
 let selDistrict = null;
 let currentScale = 1;
 let translateX = 0, translateY = 0;
@@ -543,91 +588,143 @@ function getTownName(f) {
   return f.properties.TOWNNAME || f.properties.townName || f.properties.name || '';
 }
 
-const TOPO_URL = 'https://cdn.jsdelivr.net/npm/taiwan-atlas@1.0.0/towns-10t.json';
+// 用圖片座標渲染 overlay（不使用 D3 地理投影）
+function getImgCoords() {
+  const img = document.getElementById('map-img');
+  const imgRect = img.getBoundingClientRect();
+  const rootRect = mapRoot.getBoundingClientRect();
+  return {
+    left: imgRect.left - rootRect.left,
+    top:  imgRect.top  - rootRect.top,
+    w: imgRect.width,
+    h: imgRect.height,
+  };
+}
 
-d3.json(TOPO_URL).then(topo => {
-  const key = Object.keys(topo.objects)[0];
-  const allFeatures = topojson.feature(topo, topo.objects[key]).features;
+function posToScreen(pos) {
+  const c = getImgCoords();
+  return {
+    x: c.left + pos.x * c.w,
+    y: c.top  + pos.y * c.h,
+  };
+}
 
-  const COUNTY_NAMES = ['台北','臺北','新北'];
-  const features = allFeatures.filter(f => {
-    const county = f.properties.COUNTYNAME || f.properties.countyName || '';
-    const cid    = String(f.properties.COUNTYID || f.properties.countyId || '');
-    return COUNTY_NAMES.some(n => county.includes(n)) || ['63','65'].includes(cid);
-  });
+// Build overlay elements for each district
+const overlayDiv = document.createElement('div');
+overlayDiv.id = 'map-overlay';
+overlayDiv.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+mapRoot.appendChild(overlayDiv);
 
-  const usedFeatures = features.length >= 10 ? features :
-    allFeatures.filter(f => {
-      const t = f.properties.TOWNNAME || f.properties.townName || f.properties.name || '';
-      return Object.keys(DD).some(d => t.includes(d.replace(/[區市鄉鎮]/g,'')));
-    });
+const tip = document.getElementById('map-tip');
 
-  // Hit areas (transparent, hover highlight)
-  hitG.selectAll('path.d-hit')
-    .data(usedFeatures)
-    .join('path')
-    .attr('class','d-hit')
-    .attr('d', pathGen)
-    .on('mousemove', function(event, f) {
-      const name = getTownName(f);
-      const dd   = DD[name] || {};
+function renderOverlay() {
+  overlayDiv.innerHTML = '';
+  Object.entries(MAP_POSITIONS).forEach(([name, pos]) => {
+    const dd = DD[name] || {};
+    const sc = posToScreen(pos);
+
+    // Hit circle (invisible, pointer-events on)
+    const hit = document.createElement('div');
+    hit.dataset.name = name;
+    hit.style.cssText = `
+      position:absolute;
+      left:${sc.x}px; top:${sc.y}px;
+      transform:translate(-50%,-50%);
+      width:${dd.count ? 52 : 44}px;
+      height:${dd.count ? 52 : 44}px;
+      border-radius:50%;
+      cursor:pointer;
+      pointer-events:all;
+      z-index:5;
+    `;
+
+    // Count bubble (only for districts with data)
+    if (dd.count) {
+      const bubble = document.createElement('div');
+      bubble.style.cssText = `
+        position:absolute;
+        bottom:-2px; right:-2px;
+        width:20px; height:20px;
+        border-radius:50%;
+        background:#1B3A6B;
+        color:white;
+        font-size:10px; font-weight:700;
+        display:flex; align-items:center; justify-content:center;
+        border:1.5px solid white;
+        font-family:sans-serif;
+      `;
+      bubble.textContent = dd.count;
+      hit.appendChild(bubble);
+    }
+
+    // Label
+    const label = document.createElement('div');
+    label.style.cssText = `
+      position:absolute;
+      left:50%; top:-18px;
+      transform:translateX(-50%);
+      font-size:${dd.count ? 11 : 10}px;
+      font-weight:${dd.count ? '700' : '500'};
+      color:white;
+      text-shadow:0 1px 3px rgba(0,0,0,.8), 0 0 6px rgba(0,0,0,.6);
+      white-space:nowrap;
+      pointer-events:none;
+      font-family:'Noto Sans TC',sans-serif;
+      opacity:${dd.count ? 1 : 0.7};
+    `;
+    label.textContent = name;
+    hit.appendChild(label);
+
+    // Hover events
+    hit.addEventListener('mouseenter', e => {
       const topC = Object.entries(dd.colors||{}).sort((a,b)=>b[1]-a[1])[0];
-      const rect = mapRoot.getBoundingClientRect();
+      const rootRect = mapRoot.getBoundingClientRect();
       document.getElementById('tt-name').textContent  = name;
       document.getElementById('tt-count').textContent = (dd.count||0) + ' 筆';
       document.getElementById('tt-color').textContent = topC ? topC[0] : '—';
       document.getElementById('tt-pose').textContent  = (dd.poses||[])[0] || '—';
-      tip.style.left = Math.min(event.clientX - rect.left + 14, W - 200) + 'px';
-      tip.style.top  = Math.max(event.clientY - rect.top  - 70, 10) + 'px';
+      tip.style.left = Math.min(sc.x + 30, W - 200) + 'px';
+      tip.style.top  = Math.max(sc.y - 80, 10) + 'px';
       tip.classList.add('show');
-    })
-    .on('mouseleave', function() {
+      hit.style.background = 'rgba(255,255,255,0.2)';
+    });
+    hit.addEventListener('mouseleave', () => {
       tip.classList.remove('show');
-    })
-    .on('click', function(event, f) {
-      event.stopPropagation();
-      const name = getTownName(f);
-      hitG.selectAll('.d-hit').classed('active', false);
-      d3.select(this).classed('active', true);
+      hit.style.background = '';
+    });
+    hit.addEventListener('click', e => {
+      e.stopPropagation();
       selDistrict = name;
       fillPanel(name);
       document.getElementById('side-panel').classList.add('open');
     });
 
-  // District labels
-  labelG.selectAll('text.d-label')
-    .data(usedFeatures)
-    .join('text')
-    .attr('class', f => 'd-label' + ((!DD[getTownName(f)]?.count) ? ' dark' : ''))
-    .attr('transform', f => 'translate(' + pathGen.centroid(f) + ')')
-    .attr('text-anchor','middle').attr('dy','0.35em')
-    .attr('font-size', 10).attr('font-weight','700')
-    .attr('pointer-events','none')
-    .attr('paint-order','stroke')
-    .attr('fill', f => DD[getTownName(f)]?.count >= 3 ? 'white' : 'rgba(255,255,255,0.9)')
-    .attr('stroke','rgba(0,0,0,.45)').attr('stroke-width', 2.5)
-    .text(f => getTownName(f));
+    overlayDiv.appendChild(hit);
+  });
+}
 
-  // Hide loading
-  const ml = document.getElementById('map-loading');
-  ml.style.opacity = '0';
-  setTimeout(() => ml.style.display='none', 400);
+// Initial render
+renderOverlay();
 
-  window._mapPath = pathGen;
-  window._mapFeatures = usedFeatures;
+// Re-render on zoom/pan (positions change)
+const origApply = applyTransform;
+applyTransform = function() {
+  origApply();
+  renderOverlay();
+};
 
-}).catch(() => {
-  document.getElementById('map-loading').innerHTML =
-    '<p style="font-size:13px;color:var(--text-2)">地圖載入失敗，請重新整理</p>';
-});
-
-svg.on('click', () => {
-  if (selDistrict) {
+// Click outside to close panel
+mapRoot.addEventListener('click', e => {
+  if (!e.target.dataset.name && selDistrict) {
     selDistrict = null;
-    hitG.selectAll('.d-hit').classed('active', false);
     closePanel();
   }
 });
+
+// Hide loading
+const ml = document.getElementById('map-loading');
+ml.style.opacity = '0';
+setTimeout(() => ml.style.display='none', 200);
 
 function zoomIn()    { currentScale = Math.min(8, currentScale * 1.4); applyTransform(); }
 function zoomOut()   { currentScale = Math.max(0.5, currentScale * 0.7); applyTransform(); }
