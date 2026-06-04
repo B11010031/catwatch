@@ -244,6 +244,163 @@ header{
 .lb-btn{flex:1;padding:10px;border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;border:1px solid var(--border);background:white;color:var(--text-2)}
 .lb-btn.primary{background:var(--navy);color:white;border-color:var(--navy)}
 .lb-btn.primary:hover{background:var(--blue-dark)}
+
+/* ── 街貓圖鑑頁 ─────────────────────────────────────── */
+#page-stats{
+  position:relative;
+  overflow-y:auto;
+  min-height:100%;
+  background:#0a1628;
+}
+#stats-bg{
+  position:fixed;
+  inset:0;
+  background-image:url('/public/dashboard_bg.webp');
+  background-size:cover;
+  background-position:center;
+  z-index:0;
+  opacity:0.35;
+  pointer-events:none;
+}
+.stats-content{
+  position:relative;
+  z-index:1;
+  padding:24px;
+  max-width:1200px;
+  margin:0 auto;
+}
+.stats-metric-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin-bottom:20px;
+}
+.stats-metric{
+  background:rgba(15,25,50,0.82);
+  backdrop-filter:blur(8px);
+  border:0.5px solid rgba(255,255,255,.12);
+  border-radius:var(--r-lg);
+  padding:16px 18px;
+}
+.stats-metric-val{
+  font-size:28px;
+  font-weight:700;
+  color:white;
+  line-height:1.1;
+}
+.stats-metric-lbl{
+  font-size:12px;
+  color:rgba(255,255,255,.55);
+  margin-top:4px;
+}
+.stats-metric-sub{
+  font-size:11px;
+  color:rgba(255,255,255,.35);
+  margin-top:2px;
+}
+.stats-section-label{
+  font-size:11px;
+  font-weight:600;
+  color:rgba(255,255,255,.4);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  margin-bottom:10px;
+}
+.stats-charts-row{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:12px;
+  margin-bottom:20px;
+}
+.stats-card{
+  background:rgba(15,25,50,0.82);
+  backdrop-filter:blur(8px);
+  border:0.5px solid rgba(255,255,255,.12);
+  border-radius:var(--r-lg);
+  padding:16px;
+}
+.stats-card-title{
+  font-size:13px;
+  font-weight:600;
+  color:rgba(255,255,255,.85);
+  margin-bottom:12px;
+}
+.stats-bottom-row{
+  display:grid;
+  grid-template-columns:1.6fr 1fr;
+  gap:12px;
+}
+.stats-bar-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:6px;
+}
+.stats-bar-lbl{
+  font-size:11px;
+  color:rgba(255,255,255,.55);
+  width:56px;
+  text-align:right;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.stats-bar-bg{
+  flex:1;
+  height:7px;
+  background:rgba(255,255,255,.08);
+  border-radius:4px;
+  overflow:hidden;
+}
+.stats-bar-fill{
+  height:7px;
+  border-radius:4px;
+}
+.stats-bar-val{
+  font-size:11px;
+  color:rgba(255,255,255,.4);
+  min-width:22px;
+  text-align:right;
+}
+.heat-tip{
+  position:fixed;
+  background:rgba(10,22,40,0.95);
+  border:0.5px solid rgba(255,255,255,.2);
+  border-radius:6px;
+  padding:6px 10px;
+  font-size:11px;
+  color:white;
+  pointer-events:none;
+  display:none;
+  z-index:999;
+}
+table.s-heat{border-collapse:collapse;width:100%}
+table.s-heat th{
+  color:rgba(255,255,255,.4);
+  font-size:10px;
+  font-weight:400;
+  padding:3px 4px;
+  text-align:center;
+}
+table.s-heat td{
+  padding:3px 4px;
+  text-align:center;
+  border-radius:3px;
+  cursor:pointer;
+  font-size:10px;
+  width:46px;
+  height:24px;
+}
+.rank-list-s{list-style:none;display:flex;flex-direction:column;gap:7px}
+.rank-item-s{display:flex;align-items:center;gap:8px;font-size:12px}
+.rank-no-s{font-size:11px;color:rgba(255,255,255,.3);width:16px;text-align:right}
+.rank-name-s{flex:1;color:rgba(255,255,255,.8)}
+.rank-bar-wrap-s{width:70px;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+.rank-bar-s{height:5px;border-radius:3px;background:#3B82F6}
+.rank-xp-s{font-size:11px;color:rgba(255,255,255,.4);min-width:40px;text-align:right}
+.donut-wrap-s{display:flex;align-items:center;gap:10px}
+.donut-legs-s{display:flex;flex-direction:column;gap:3px;flex:1}
+.donut-leg-s{font-size:10px;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:4px}
 </style>
 </head>
 <body>
@@ -869,6 +1026,7 @@ async function loadStats() {
     renderPC();
 
     console.log('✅ 數據載入完成', data.total, '筆回報');
+    initStatsPage(data);
 
   } catch (err) {
     console.warn('API 載入失敗，使用預設資料:', err.message);
@@ -885,6 +1043,198 @@ renderPC();
 loadStats();
 
 window.addEventListener('resize', () => { buildMapLabels(); });
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<!-- STATS PAGE -->
+<div id="page-stats" class="page">
+  <div id="stats-bg"></div>
+  <div class="stats-content">
+
+    <div style="margin-bottom:20px">
+      <div class="stats-section-label">總覽</div>
+      <div class="stats-metric-row">
+        <div class="stats-metric">
+          <div class="stats-metric-val" id="s-total">—</div>
+          <div class="stats-metric-lbl">總回報筆數</div>
+          <div class="stats-metric-sub">去重後</div>
+        </div>
+        <div class="stats-metric">
+          <div class="stats-metric-val" id="s-cats">—</div>
+          <div class="stats-metric-lbl">貓咪個體數</div>
+          <div class="stats-metric-sub">實際計算</div>
+        </div>
+        <div class="stats-metric">
+          <div class="stats-metric-val" id="s-areas">—</div>
+          <div class="stats-metric-lbl">覆蓋行政區</div>
+          <div class="stats-metric-sub">大台北+離島</div>
+        </div>
+        <div class="stats-metric">
+          <div class="stats-metric-val" id="s-users">—</div>
+          <div class="stats-metric-lbl">回報用戶數</div>
+          <div class="stats-metric-sub">累計</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div class="stats-section-label">分布分析</div>
+      <div class="stats-charts-row">
+        <div class="stats-card">
+          <div class="stats-card-title">毛色分布</div>
+          <div class="donut-wrap-s">
+            <canvas id="s-donut" role="img" aria-label="毛色分布" width="90" height="90"></canvas>
+            <div class="donut-legs-s" id="s-donut-leg"></div>
+          </div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-card-title">姿勢分布</div>
+          <div id="s-pose-bars"></div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-card-title">環境分布</div>
+          <div id="s-env-bars"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="stats-section-label">深度分析</div>
+      <div class="stats-bottom-row">
+        <div class="stats-card" style="position:relative">
+          <div class="stats-card-title">毛色 × 姿勢 熱力圖</div>
+          <div style="overflow-x:auto">
+            <table class="s-heat" id="s-heat" aria-label="毛色姿勢熱力圖"></table>
+          </div>
+          <div class="heat-tip" id="s-tip"></div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-card-title">用戶 XP 排行</div>
+          <ul class="rank-list-s" id="s-rank"></ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── 街貓圖鑑頁初始化 ──────────────────────────────────
+function initStatsPage(data) {
+  if (!data) return;
+
+  // 總覽數字
+  document.getElementById('s-total').textContent = data.total || '—';
+  document.getElementById('s-cats').textContent  = data.totalCats || '—';
+  document.getElementById('s-areas').textContent = Object.keys(data.districts||{}).length || '—';
+  document.getElementById('s-users').textContent = (data.topUsers||[]).length ? '73+' : '—';
+
+  // 從 districts 統計各分布
+  const colorCnt={}, poseCnt={}, envCnt={};
+  Object.values(data.districts||{}).forEach(d=>{
+    Object.entries(d.colorCnt||{}).forEach(([k,v])=>{ colorCnt[k]=(colorCnt[k]||0)+v; });
+    Object.entries(d.poseCnt||{}).forEach(([k,v])=>{ poseCnt[k]=(poseCnt[k]||0)+v; });
+    Object.entries(d.envCnt||{}).forEach(([k,v])=>{ envCnt[k]=(envCnt[k]||0)+v; });
+  });
+
+  const CMAP = {
+    '黑貓':'#1E293B','虎斑貓':'#92400E','白貓':'#94A3B8','灰貓':'#64748B',
+    '橘貓':'#FB923C','橘白貓':'#F97316','賓士貓':'#334155',
+    '白底虎斑':'#A16207','棕白貓':'#78350F','玳瑁貓':'#b45309','三花貓':'#F59E0B'
+  };
+
+  // Donut
+  const cArr = Object.entries(colorCnt).sort((a,b)=>b[1]-a[1]);
+  const cTotal = cArr.reduce((s,[,v])=>s+v,0);
+  if(window.sDonutChart) window.sDonutChart.destroy();
+  window.sDonutChart = new Chart(document.getElementById('s-donut'),{
+    type:'doughnut',
+    data:{
+      labels:cArr.map(([k])=>k),
+      datasets:[{data:cArr.map(([,v])=>v),backgroundColor:cArr.map(([k])=>CMAP[k]||'#64748B'),borderWidth:1,borderColor:'rgba(0,0,0,.3)'}]
+    },
+    options:{responsive:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}筆`}}}}
+  });
+  const dleg=document.getElementById('s-donut-leg');
+  dleg.innerHTML='';
+  cArr.slice(0,6).forEach(([k,v])=>{
+    dleg.innerHTML+=`<div class="donut-leg-s"><span style="width:8px;height:8px;border-radius:2px;background:${CMAP[k]||'#888'};display:inline-block"></span>${k} ${Math.round(v/cTotal*100)}%</div>`;
+  });
+
+  // Bars helper
+  function makeBars(id,obj,color){
+    const arr=Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,7);
+    const mx=arr[0]?arr[0][1]:1;
+    const el=document.getElementById(id);
+    el.innerHTML='';
+    arr.forEach(([k,v])=>{
+      el.innerHTML+=`<div class="stats-bar-row">
+        <div class="stats-bar-lbl">${k}</div>
+        <div class="stats-bar-bg"><div class="stats-bar-fill" style="width:${Math.round(v/mx*100)}%;background:${color}"></div></div>
+        <div class="stats-bar-val">${v}</div>
+      </div>`;
+    });
+  }
+  makeBars('s-pose-bars',poseCnt,'#3B82F6');
+  makeBars('s-env-bars',envCnt,'#14B8A6');
+
+  // Heatmap
+  const colors = cArr.slice(0,6).map(([k])=>k);
+  const poses  = Object.entries(poseCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k])=>k);
+  const hmap   = {};
+  colors.forEach(c=>{ hmap[c]={}; poses.forEach(p=>{ hmap[c][p]=0; }); });
+  Object.values(data.districts||{}).forEach(d=>{
+    const dc=d.colorCnt||{}, dp=d.poseCnt||{};
+    colors.forEach(c=>{
+      poses.forEach(p=>{
+        if(dc[c]&&dp[p]) hmap[c][p]+= Math.min(dc[c],dp[p]);
+      });
+    });
+  });
+  const allH=colors.flatMap(c=>poses.map(p=>hmap[c][p]));
+  const maxH=Math.max(...allH,1);
+  const tip=document.getElementById('s-tip');
+  const tbl=document.getElementById('s-heat');
+  let thead='<tr><th></th>';
+  poses.forEach(p=>{ thead+=`<th>${p.replace('坐著發呆','坐呆').replace('蜷縮躺覺','蜷縮').replace('走動中','走動')}</th>`; });
+  thead+='</tr>'; tbl.innerHTML=thead;
+  colors.forEach(cat=>{
+    let row=`<tr><td style="text-align:right;padding-right:6px;color:rgba(255,255,255,.45);font-size:10px;white-space:nowrap">${cat}</td>`;
+    poses.forEach(p=>{
+      const v=hmap[cat][p]||0;
+      const a=v===0?0:0.15+0.75*(v/maxH);
+      const bg=`rgba(59,130,246,${a.toFixed(2)})`;
+      const tc=a>0.5?'#fff':'rgba(255,255,255,.6)';
+      row+=`<td style="background:${bg};color:${tc}" onmouseenter="showHTip(event,'${cat}','${p}',${v})" onmouseleave="hideHTip()">${v||''}</td>`;
+    });
+    row+='</tr>'; tbl.innerHTML+=row;
+  });
+
+  // Rank
+  const rl=document.getElementById('s-rank'); rl.innerHTML='';
+  const maxXP=Math.max(...(data.topUsers||[]).map(u=>u.xp),1);
+  (data.topUsers||[]).slice(0,10).forEach((u,i)=>{
+    rl.innerHTML+=`<li class="rank-item-s">
+      <span class="rank-no-s">${i+1}</span>
+      <span class="rank-name-s">${u.name}</span>
+      <div class="rank-bar-wrap-s"><div class="rank-bar-s" style="width:${Math.round(u.xp/maxXP*100)}%"></div></div>
+      <span class="rank-xp-s">${u.xp} XP</span>
+    </li>`;
+  });
+}
+
+function showHTip(e,cat,pose,val){
+  const tip=document.getElementById('s-tip');
+  tip.style.display='block';
+  tip.style.left=(e.clientX+12)+'px';
+  tip.style.top=(e.clientY-30)+'px';
+  tip.textContent=`${cat} × ${pose}：${val} 次`;
+}
+function hideHTip(){ document.getElementById('s-tip').style.display='none'; }
+
+// 當 loadStats 完成後初始化圖鑑頁
+const _origLoadStats = loadStats;
 </script>
 </body>
 </html>
