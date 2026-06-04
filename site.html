@@ -504,7 +504,7 @@ table.s-heat td{
   <div id="pc-root">
     <div class="pc-header">
       <div class="pc-title">🖼️ 台北街貓明信片</div>
-      <div class="pc-sub">依回報資料自動生成 · 以貓咪顏色分類 · 執行 generate.mjs 後圖片自動載入</div>
+      <div class="pc-sub"></div>
     </div>
     <!-- color tabs removed -->
     <div class="pc-grid" id="pc-grid"></div>
@@ -1190,7 +1190,7 @@ function initStatsPage(data) {
   makeBars('s-env-bars',envCnt,'#14B8A6');
 
   // Heatmap
-  const colors = cArr.slice(0,6).map(([k])=>k);
+  const colors = cSorted.slice(0,6).map(([k])=>k);
   const poses  = Object.entries(poseCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k])=>k);
   const hmap   = {};
   colors.forEach(c=>{ hmap[c]={}; poses.forEach(p=>{ hmap[c][p]=0; }); });
