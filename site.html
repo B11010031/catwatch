@@ -266,8 +266,8 @@ header{
   <div id="map-root">
     <div id="map-zoom">
       <img id="map-img" src="/public/cat_map.webp" alt="台北貓版圖" draggable="false">
-      <div id="map-labels"></div>
     </div>
+    <div id="map-labels"></div>
 
     <div id="map-loading">
       <div class="spin"></div>
@@ -528,12 +528,7 @@ let dragging = false, dx = 0, dy = 0, dtx = 0, dty = 0;
 
 function applyT() {
   mapZoom.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
-  // 更新標籤反向縮放
-  document.querySelectorAll('.map-label').forEach(el => {
-    const labelScale = Math.max(0.5, 1 / scale);
-    const cur = el.style.transform;
-    el.style.transform = cur.replace(/scale\([^)]+\)/, `scale(${labelScale})`);
-  });
+  buildMapLabels();
 }
 
 // 滾輪縮放（最小 scale = 1，不露出空白）
@@ -596,11 +591,18 @@ function buildMapLabels() {
     const el = document.createElement('div');
     el.className = 'map-label' + (hasData ? ' has-data' : '');
     el.dataset.name = name;
-    el.style.left = (pos.x * 100) + '%';
-    el.style.top  = (pos.y * 100) + '%';
-    // 反向縮放：地圖放大時標籤縮小，讓標籤在視覺上保持固定大小
-    const labelScale = Math.max(0.5, 1 / scale);
-    el.style.transform = `translate(-50%,-50%) scale(${labelScale})`;
+    // 計算標籤在螢幕上的實際位置
+    // pos.x/y 是圖片比例座標 (0-1)
+    // 圖片在 map-zoom 裡是 100%x100% object-fit:cover
+    // map-zoom 的 transform = translate(tx,ty) scale(scale)
+    const rootW = mapRoot.offsetWidth;
+    const rootH = mapRoot.offsetHeight;
+    // 圖片在 zoom 容器中央，scale 從中心點展開
+    const imgX = rootW/2 + tx + (pos.x - 0.5) * rootW * scale;
+    const imgY = rootH/2 + ty + (pos.y - 0.5) * rootH * scale;
+    el.style.left = imgX + 'px';
+    el.style.top  = imgY + 'px';
+    el.style.transform = 'translate(-50%,-50%)';
 
     if (hasData) {
       el.innerHTML = `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`;
@@ -639,7 +641,7 @@ function buildMapLabels() {
 }
 
 // 視窗大小改變時重新計算位置
-window.addEventListener('resize', buildMapLabels);
+window.addEventListener('resize', () => { buildMapLabels(); });
 
 window._rebuildMapLabels = buildMapLabels;
 
@@ -835,7 +837,7 @@ renderPC();
 
 loadStats();
 
-window.addEventListener('resize', buildMapLabels);
+window.addEventListener('resize', () => { buildMapLabels(); });
 </script>
 </body>
 </html>
