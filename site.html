@@ -79,7 +79,11 @@ header{
 #map-labels{
   position:absolute;
   inset:0;
-  pointer-events:none;
+  pointer-events:none;  /* container: passthrough */
+}
+/* label children get pointer events */
+#map-labels .map-label{
+  pointer-events:all !important;
 }
 .map-label{
   position:absolute;
@@ -512,37 +516,47 @@ const MAP_POSITIONS = {
 function buildMapLabels() {
   const container = document.getElementById('map-labels');
   container.innerHTML = '';
+
   Object.entries(MAP_POSITIONS).forEach(([name, pos]) => {
     const dd = DD[name] || {};
     const hasData = dd.count > 0;
 
     const el = document.createElement('div');
     el.className = 'map-label' + (hasData ? ' has-data' : '');
+    // 直接用百分比定位，相對於 #map-labels (= #map-zoom 內的 inset:0)
     el.style.left = (pos.x * 100) + '%';
     el.style.top  = (pos.y * 100) + '%';
 
-    el.innerHTML = hasData
-      ? `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`
-      : `<div class="ml-name dim">${name}</div>`;
+    if (hasData) {
+      el.innerHTML = `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`;
+    } else {
+      el.innerHTML = `<div class="ml-name dim">${name}</div>`;
+    }
 
-    // tooltip
-    el.addEventListener('mouseenter', e => {
+    // ── tooltip ──────────────────────────────────
+    el.addEventListener('mouseenter', function(e) {
       const topC = Object.entries(dd.colors||{}).sort((a,b)=>b[1]-a[1])[0];
-      const tip = document.getElementById('map-tip');
+      const tip  = document.getElementById('map-tip');
       const root = mapRoot.getBoundingClientRect();
-      const r = el.getBoundingClientRect();
+      const r    = el.getBoundingClientRect();
+
       document.getElementById('tt-name').textContent  = name;
       document.getElementById('tt-count').textContent = (dd.count||0) + ' 筆';
       document.getElementById('tt-color').textContent = topC ? topC[0] : '—';
       document.getElementById('tt-pose').textContent  = (dd.poses||[])[0] || '—';
-      tip.style.left = Math.min(r.right - root.left + 8, root.width - 200) + 'px';
-      tip.style.top  = Math.max(r.top - root.top - 10, 8) + 'px';
+
+      let tipX = r.right - root.left + 8;
+      let tipY = r.top   - root.top  - 10;
+      if (tipX + 200 > root.width)  tipX = r.left - root.left - 210;
+      if (tipY < 8) tipY = 8;
+      tip.style.left = tipX + 'px';
+      tip.style.top  = tipY + 'px';
       tip.classList.add('show');
     });
-    el.addEventListener('mouseleave', () => {
+    el.addEventListener('mouseleave', function() {
       document.getElementById('map-tip').classList.remove('show');
     });
-    el.addEventListener('click', e => {
+    el.addEventListener('click', function(e) {
       e.stopPropagation();
       fillPanel(name);
       document.getElementById('side-panel').classList.add('open');
@@ -552,12 +566,6 @@ function buildMapLabels() {
   });
 }
 
-buildMapLabels();
-// 立即隱藏 loading
-const _ml = document.getElementById('map-loading');
-if (_ml) _ml.style.display = 'none';
-
-// re-build when data loads
 window._rebuildMapLabels = buildMapLabels;
 
 document.getElementById('map-root').addEventListener('click', () => {
