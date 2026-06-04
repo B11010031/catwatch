@@ -268,9 +268,8 @@ header{
   <div id="map-root">
     <div id="map-zoom">
       <img id="map-img" src="/public/cat_map.webp" alt="台北貓版圖" draggable="false">
+      <div id="map-labels"></div>
     </div>
-    <!-- labels outside zoom container, positioned relative to mapRoot -->
-    <div id="map-labels"></div>
 
     <div id="map-loading">
       <div class="spin"></div>
@@ -351,7 +350,7 @@ header{
       <div class="pc-title">🖼️ 台北街貓明信片</div>
       <div class="pc-sub">依回報資料自動生成 · 以貓咪顏色分類 · 執行 generate.mjs 後圖片自動載入</div>
     </div>
-    <div class="color-tabs" id="color-tabs"></div>
+    <!-- color tabs removed -->
     <div class="pc-grid" id="pc-grid"></div>
   </div>
 </div>
@@ -366,7 +365,7 @@ header{
     <div class="lb-body">
       <div class="lb-title" id="lb-title"></div>
       <div class="lb-sub"   id="lb-sub"></div>
-      <div class="lb-prompt"><div class="lb-prompt-lbl">🎨 Gemini 生成 Prompt</div><div id="lb-prompt"></div></div>
+      <!-- prompt removed -->
       <div class="lb-acts">
         <button class="lb-btn" onclick="doShare()">🔗 分享</button>
         <button class="lb-btn primary" onclick="doDownload()">⬇ 下載圖片</button>
@@ -524,22 +523,31 @@ let dragging = false, dx = 0, dy = 0, dtx = 0, dty = 0;
 
 function applyT() {
   mapZoom.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
-  if (typeof buildMapLabels === 'function') buildMapLabels();
 }
 
-// 滾輪縮放
+// 滾輪縮放（最小 scale = 1，不露出空白）
 mapRoot.addEventListener('wheel', e => {
   e.preventDefault();
   const rect = mapRoot.getBoundingClientRect();
   const mx = e.clientX - rect.left - rect.width/2;
   const my = e.clientY - rect.top  - rect.height/2;
   const delta = e.deltaY < 0 ? 1.12 : 0.89;
-  const ns = Math.max(0.5, Math.min(10, scale * delta));
+  const ns = Math.max(1, Math.min(10, scale * delta));
   tx = mx - (mx - tx) * (ns / scale);
   ty = my - (my - ty) * (ns / scale);
   scale = ns;
+  clampTranslate();
   applyT();
 }, { passive: false });
+
+function clampTranslate() {
+  // 限制平移範圍，確保圖片始終填滿容器
+  const rect = mapRoot.getBoundingClientRect();
+  const maxTx = rect.width  * (scale - 1) / 2;
+  const maxTy = rect.height * (scale - 1) / 2;
+  tx = Math.max(-maxTx, Math.min(maxTx, tx));
+  ty = Math.max(-maxTy, Math.min(maxTy, ty));
+}
 
 // 拖曳平移
 mapRoot.addEventListener('mousedown', e => {
@@ -548,7 +556,9 @@ mapRoot.addEventListener('mousedown', e => {
 });
 window.addEventListener('mousemove', e => {
   if (!dragging) return;
-  tx = dtx + e.clientX - dx; ty = dty + e.clientY - dy; applyT();
+  tx = dtx + e.clientX - dx; ty = dty + e.clientY - dy;
+  clampTranslate();
+  applyT();
 });
 window.addEventListener('mouseup', () => { dragging = false; });
 
@@ -559,35 +569,10 @@ mapRoot.addEventListener('touchstart', e => {
   else { dragging=true; dx=e.touches[0].clientX; dy=e.touches[0].clientY; dtx=tx; dty=ty; }
 }, {passive:true});
 mapRoot.addEventListener('touchmove', e => {
-  if (e.touches.length===2) { const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); scale=Math.max(0.5,Math.min(10,scale*d/lastDist)); lastDist=d; applyT(); }
-  else if(dragging){ tx=dtx+e.touches[0].clientX-dx; ty=dty+e.touches[0].clientY-dy; applyT(); }
+  if (e.touches.length===2) { const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); scale=Math.max(1,Math.min(10,scale*d/lastDist)); lastDist=d; clampTranslate(); applyT(); }
+  else if(dragging){ tx=dtx+e.touches[0].clientX-dx; ty=dty+e.touches[0].clientY-dy; clampTranslate(); applyT(); }
 },{passive:true});
 mapRoot.addEventListener('touchend',()=>{dragging=false;});
-
-// ── 計算圖片在容器內的實際顯示區域 ─────────────────────
-// object-fit:cover 會等比縮放並裁切
-function getImgRect() {
-  const img  = document.getElementById('map-img');
-  const root = mapRoot.getBoundingClientRect();
-  const rW = root.width, rH = root.height;
-  const iW = img.naturalWidth  || 1600;
-  const iH = img.naturalHeight || 900;
-  const scale_c = Math.max(rW / iW, rH / iH);  // cover scale
-  const dW = iW * scale_c;
-  const dH = iH * scale_c;
-  const offX = (rW - dW) / 2;
-  const offY = (rH - dH) / 2;
-  return { offX, offY, dW, dH };
-}
-
-function placeLabel(el, pos) {
-  const { offX, offY, dW, dH } = getImgRect();
-  // pos.x/y 是相對於圖片本身的比例
-  const x = offX + pos.x * dW;
-  const y = offY + pos.y * dH;
-  el.style.left = x + 'px';
-  el.style.top  = y + 'px';
-}
 
 function buildMapLabels() {
   const container = document.getElementById('map-labels');
@@ -600,7 +585,11 @@ function buildMapLabels() {
     const el = document.createElement('div');
     el.className = 'map-label' + (hasData ? ' has-data' : '');
     el.dataset.name = name;
-    placeLabel(el, pos);
+    // 直接用 % 定位，#map-labels 是 #map-zoom 的 inset:0 子元素
+    // #map-zoom 裡 img 是 object-fit:cover 100%x100%
+    // 所以 % 座標直接對應圖片比例位置
+    el.style.left = (pos.x * 100) + '%';
+    el.style.top  = (pos.y * 100) + '%';
 
     if (hasData) {
       el.innerHTML = `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`;
@@ -658,9 +647,9 @@ mapRoot.addEventListener('click', () => {
   document.getElementById('side-panel').classList.remove('open');
 });
 
-function zoomIn()    { scale = Math.min(10, scale*1.4); applyT(); buildMapLabels(); }
-function zoomOut()   { scale = Math.max(0.5, scale*0.7); applyT(); buildMapLabels(); }
-function zoomReset() { scale=1; tx=0; ty=0; applyT(); buildMapLabels(); }
+function zoomIn()    { scale = Math.min(10, scale*1.4); clampTranslate(); applyT(); }
+function zoomOut()   { scale = Math.max(1, scale*0.7); clampTranslate(); applyT(); }
+function zoomReset() { scale=1; tx=0; ty=0; applyT(); }
 
 /* ═══════════════════════════════════════
    POSTCARDS — 顏色分類
@@ -755,7 +744,7 @@ function openLb(id){
   document.getElementById('lb-img-wrap').style.background = c.light||'var(--blue-light)';
   document.getElementById('lb-title').textContent = `${p.colorZh} · ${p.district}`;
   document.getElementById('lb-sub').textContent   = `共 ${p.count} 筆回報`;
-  document.getElementById('lb-prompt').textContent = p.prompt;
+  // prompt removed
   document.getElementById('lb').classList.add('show');
 }
 function lbClose(e){ if(e.target.id==='lb') document.getElementById('lb').classList.remove('show'); }
@@ -834,7 +823,6 @@ async function loadStats() {
 
 
 // 初始化明信片（API 載入前先顯示預設資料）
-buildColorTabs();
 renderPC();
 
 loadStats();
