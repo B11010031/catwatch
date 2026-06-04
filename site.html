@@ -93,7 +93,7 @@ header{
 }
 .map-label:hover .ml-name{ background:rgba(27,58,107,.85); }
 .ml-name{
-  font-size:10px;font-weight:700;
+  font-size:var(--label-fs, 10px);font-weight:700;
   color:white;
   text-shadow:0 1px 3px rgba(0,0,0,.9);
   white-space:nowrap;
@@ -106,13 +106,13 @@ header{
 .ml-name.dim{
   opacity:0.5;
   font-weight:500;
-  font-size:9px;
+  font-size:calc(var(--label-fs, 10px) * 0.85);
   background:rgba(0,0,0,.2);
 }
 .ml-count{
   background:#1B3A6B;
   color:white;
-  font-size:10px;font-weight:700;
+  font-size:var(--label-fs, 10px);font-weight:700;
   border-radius:10px;
   padding:1px 7px;
   border:1.5px solid rgba(255,255,255,.8);
@@ -597,11 +597,13 @@ function buildMapLabels() {
     // map-zoom 的 transform = translate(tx,ty) scale(scale)
     const rootW = mapRoot.offsetWidth;
     const rootH = mapRoot.offsetHeight;
-    // 圖片在 zoom 容器中央，scale 從中心點展開
     const imgX = rootW/2 + tx + (pos.x - 0.5) * rootW * scale;
     const imgY = rootH/2 + ty + (pos.y - 0.5) * rootH * scale;
     el.style.left = imgX + 'px';
     el.style.top  = imgY + 'px';
+    // 字體大小：隨縮放調整但有上下限
+    const fontSize = Math.min(13, Math.max(9, 10 * Math.sqrt(scale)));
+    el.style.setProperty('--label-fs', fontSize + 'px');
     el.style.transform = 'translate(-50%,-50%)';
 
     if (hasData) {
