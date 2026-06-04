@@ -399,7 +399,7 @@ table.s-heat td{
 .rank-bar-s{height:5px;border-radius:3px;background:#3B82F6}
 .rank-xp-s{font-size:11px;color:#64748B;min-width:40px;text-align:right}
 .donut-wrap-s{display:flex;align-items:center;justify-content:center;gap:14px}
-.donut-legs-s{display:flex;flex-direction:column;gap:3px;flex:1}
+.donut-legs-s{display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;max-height:160px}
 .donut-leg-s{font-size:11px;color:#334155;display:flex;align-items:center;gap:4px}
 </style>
 </head>
@@ -1140,27 +1140,41 @@ function initStatsPage(data) {
   });
 
   const CMAP = {
-    '黑貓':'#1E293B','虎斑貓':'#92400E','白貓':'#94A3B8','灰貓':'#64748B',
-    '橘貓':'#FB923C','橘白貓':'#F97316','賓士貓':'#334155',
-    '白底虎斑':'#A16207','棕白貓':'#78350F','玳瑁貓':'#b45309','三花貓':'#F59E0B'
+    '黑貓':     '#1E293B',
+    '虎斑貓':   '#D97706',
+    '白貓':     '#E2E8F0',
+    '灰貓':     '#94A3B8',
+    '橘貓':     '#F97316',
+    '橘白貓':   '#FDBA74',
+    '賓士貓':   '#6366F1',
+    '白底虎斑': '#84CC16',
+    '棕白貓':   '#A16207',
+    '玳瑁貓':   '#EC4899',
+    '三花貓':   '#14B8A6',
   };
 
   // Donut
-  const cArr = Object.entries(colorCnt).sort((a,b)=>b[1]-a[1]);
+  const cSorted = Object.entries(colorCnt).sort((a,b)=>b[1]-a[1]);
+  const cTop6 = cSorted.slice(0,6);
+  const cOtherVal = cSorted.slice(6).reduce((s,[,v])=>s+v,0);
+  const cArr = cOtherVal > 0 ? [...cTop6, ['其他', cOtherVal]] : cTop6;
   const cTotal = cArr.reduce((s,[,v])=>s+v,0);
+  const cBgs = [...cTop6.map(([k])=>CMAP[k]||'#64748B'), '#CBD5E1'];
   if(window.sDonutChart) window.sDonutChart.destroy();
   window.sDonutChart = new Chart(document.getElementById('s-donut'),{
     type:'doughnut',
     data:{
       labels:cArr.map(([k])=>k),
-      datasets:[{data:cArr.map(([,v])=>v),backgroundColor:cArr.map(([k])=>CMAP[k]||'#64748B'),borderWidth:1,borderColor:'rgba(255,255,255,.8)'}]
+      datasets:[{data:cArr.map(([,v])=>v),backgroundColor:cBgs,borderWidth:2,borderColor:'#fff'}]
     },
-    options:{responsive:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}筆`}}}}
+    options:{responsive:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}筆`}}}}
   });
   const dleg=document.getElementById('s-donut-leg');
   dleg.innerHTML='';
-  cArr.slice(0,6).forEach(([k,v])=>{
-    dleg.innerHTML+=`<div class="donut-leg-s"><span style="width:8px;height:8px;border-radius:2px;background:${CMAP[k]||'#888'};display:inline-block"></span>${k} ${Math.round(v/cTotal*100)}%</div>`;
+  // 圖例顯示全部顏色（包含其他裡面的細項）
+  cSorted.forEach(([k,v])=>{
+    const bg = CMAP[k]||'#CBD5E1';
+    dleg.innerHTML+=`<div class="donut-leg-s"><span style="width:9px;height:9px;border-radius:2px;background:${bg};display:inline-block;flex-shrink:0"></span>${k} ${Math.round(v/cTotal*100)}%</div>`;
   });
 
   // Bars helper
