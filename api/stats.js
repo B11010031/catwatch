@@ -1,4 +1,4 @@
-// api/stats.js — 去重版本
+// api/stats.js — 去重版本 v2
 const DATA = {
   "ok": true,
   "total": 81,
@@ -141,7 +141,7 @@ const DATA = {
       "topColor": "白貓",
       "topPose": "坐著發呆",
       "topEnv": "其他",
-      "landmark": "桃園市的街道"
+      "landmark": "桃園市老街廟宇群"
     },
     "松山區": {
       "count": 3,
@@ -359,7 +359,7 @@ const DATA = {
       "district": "桃園市",
       "count": 13,
       "img": "/public/postcards/white.jpg",
-      "prompt": "桃園市，一隻巨大白貓，背景是桃園市街道"
+      "prompt": "桃園市，一隻巨大白貓，背景是桃園市老街廟宇群"
     },
     {
       "color": "tortoiseshell",
@@ -383,7 +383,7 @@ const DATA = {
       "district": "桃園市",
       "count": 4,
       "img": "/public/postcards/black_white.jpg",
-      "prompt": "桃園市，一隻巨大賓士貓，背景是桃園市街道"
+      "prompt": "桃園市，一隻巨大賓士貓，背景是桃園市老街廟宇群"
     },
     {
       "color": "white_tabby",
