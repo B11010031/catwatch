@@ -289,7 +289,7 @@ header{
       <div class="leg-row"><div class="leg-sw" style="background:#1B3A6B"></div>5+ 筆</div>
       <div style="font-size:10.5px;color:#0F766E;font-weight:600;margin:8px 0 5px;">🟢 新北市</div>
       <div class="leg-row"><div class="leg-sw" style="background:#E0F2FE"></div>尚無回報</div>
-      <div class="leg-row"><div class="leg-sw" style="background:#99F6E4"></div>1–2 筆</div>
+      <div class="leg-row"><div class="leg-sw" style="background:#5FA89A"></div>1–2 筆</div>
       <div class="leg-row"><div class="leg-sw" style="background:#14B8A6"></div>3–4 筆</div>
       <div class="leg-row"><div class="leg-sw" style="background:#0F766E"></div>5+ 筆</div>
     </div>
@@ -638,8 +638,20 @@ function buildMapLabels() {
     el.style.setProperty('--label-fs', fontSize + 'px');
     el.style.transform = 'translate(-50%,-50%)';
 
+    // 顏色依照城市和回報數量
+    const isNTP = dd.city === '新北市';
+    const cnt = dd.count || 0;
+    let bgColor = '';
     if (hasData) {
-      el.innerHTML = `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`;
+      if (isNTP) {
+        bgColor = cnt >= 5 ? '#0F766E' : cnt >= 3 ? '#14B8A6' : '#5FA89A';
+      } else {
+        bgColor = cnt >= 5 ? '#1B3A6B' : cnt >= 3 ? '#3B82F6' : '#93C5FD';
+      }
+    }
+    el.dataset.city = dd.city || '';
+    if (hasData) {
+      el.innerHTML = `<div class="ml-name" style="${bgColor ? `background:${bgColor}` : ''}">${name}</div><div class="ml-count" style="${bgColor ? `background:${bgColor}` : ''}">${cnt}</div>`;
     } else {
       el.innerHTML = `<div class="ml-name dim">${name}</div>`;
     }
