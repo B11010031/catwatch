@@ -568,6 +568,12 @@ function buildMapLabels() {
 
 window._rebuildMapLabels = buildMapLabels;
 
+// 初始化標籤
+buildMapLabels();
+// 隱藏 loading
+const _ml = document.getElementById('map-loading');
+if (_ml) _ml.style.display = 'none';
+
 document.getElementById('map-root').addEventListener('click', () => {
   document.getElementById('side-panel').classList.remove('open');
 });
@@ -740,6 +746,8 @@ async function loadStats() {
       redrawLabels(window._mapPath, window._mapFeatures);
     }
 
+    // 重新渲染地圖標籤
+    if (window._rebuildMapLabels) window._rebuildMapLabels();
     // 重新渲染明信片
     buildColorTabs();
     renderPC();
