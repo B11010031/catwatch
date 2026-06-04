@@ -516,6 +516,54 @@ const MAP_POSITIONS = {
   '大安區': { x: 0.4469, y: 0.4866 },
 };
 
+// ── 地圖縮放平移變數 ─────────────────────────────────────
+const mapRoot = document.getElementById('map-root');
+const mapZoom = document.getElementById('map-zoom');
+let scale = 1, tx = 0, ty = 0;
+let dragging = false, dx = 0, dy = 0, dtx = 0, dty = 0;
+
+function applyT() {
+  mapZoom.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if (typeof buildMapLabels === 'function') buildMapLabels();
+}
+
+// 滾輪縮放
+mapRoot.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = mapRoot.getBoundingClientRect();
+  const mx = e.clientX - rect.left - rect.width/2;
+  const my = e.clientY - rect.top  - rect.height/2;
+  const delta = e.deltaY < 0 ? 1.12 : 0.89;
+  const ns = Math.max(0.5, Math.min(10, scale * delta));
+  tx = mx - (mx - tx) * (ns / scale);
+  ty = my - (my - ty) * (ns / scale);
+  scale = ns;
+  applyT();
+}, { passive: false });
+
+// 拖曳平移
+mapRoot.addEventListener('mousedown', e => {
+  if (e.target.closest('.map-label')) return;
+  dragging = true; dx = e.clientX; dy = e.clientY; dtx = tx; dty = ty;
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  tx = dtx + e.clientX - dx; ty = dty + e.clientY - dy; applyT();
+});
+window.addEventListener('mouseup', () => { dragging = false; });
+
+// 觸控
+let lastDist = 0;
+mapRoot.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) lastDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+  else { dragging=true; dx=e.touches[0].clientX; dy=e.touches[0].clientY; dtx=tx; dty=ty; }
+}, {passive:true});
+mapRoot.addEventListener('touchmove', e => {
+  if (e.touches.length===2) { const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); scale=Math.max(0.5,Math.min(10,scale*d/lastDist)); lastDist=d; applyT(); }
+  else if(dragging){ tx=dtx+e.touches[0].clientX-dx; ty=dty+e.touches[0].clientY-dy; applyT(); }
+},{passive:true});
+mapRoot.addEventListener('touchend',()=>{dragging=false;});
+
 // ── 計算圖片在容器內的實際顯示區域 ─────────────────────
 // object-fit:cover 會等比縮放並裁切
 function getImgRect() {
