@@ -27,7 +27,7 @@ header{
   display:flex;align-items:center;padding:0 24px;gap:0;
   box-shadow:0 2px 12px rgba(27,58,107,.07);
 }
-.logo-img{height:30px;width:auto;object-fit:contain;flex-shrink:0}
+.logo-img{height:30px;width:auto;object-fit:cover;flex-shrink:0}
 .header-div{width:1px;height:30px;background:var(--border);margin:0 22px}
 .tab-bar{display:flex;gap:3px}
 .tab{
@@ -71,7 +71,7 @@ header{
 }
 #map-img{
   width:100%;height:100%;
-  object-fit:contain;
+  object-fit:cover;
   display:block;
   pointer-events:none;
   user-select:none;
@@ -233,7 +233,7 @@ header{
 #lb.show{display:flex}
 .lb-box{background:white;border-radius:var(--r-lg);max-width:860px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:var(--sh-lg);position:relative}
 .lb-img{height:520px;background:var(--blue-light);border-radius:var(--r-lg) var(--r-lg) 0 0;overflow:hidden}
-.lb-img img{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.lb-img img{width:100%;height:100%;object-fit:cover;display:block;background:#000}
 .lb-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.85);border:none;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
 .lb-body{padding:20px 24px 24px}
 .lb-title{font-size:20px;font-weight:700;color:var(--navy);margin-bottom:3px}
@@ -601,23 +601,34 @@ function buildMapLabels() {
     const natW = img.naturalWidth  || 1600;
     const natH = img.naturalHeight || 900;
 
-    // object-fit:contain 的實際顯示尺寸（letterbox）
-    const fitScale = Math.min(rootW / natW, rootH / natH);
-    const dispW = natW * fitScale;
-    const dispH = natH * fitScale;
-    const offX  = (rootW - dispW) / 2;
-    const offY  = (rootH - dispH) / 2;
+    // ── 校正工具用 contain，網站用 cover，需要座標轉換 ──
+    // Step 1: contain 的顯示區域
+    const cScale = Math.min(rootW / natW, rootH / natH);
+    const cW = natW * cScale;  // contain 顯示寬
+    const cH = natH * cScale;  // contain 顯示高
+    const cOffX = (rootW - cW) / 2;  // letterbox 左右偏移
+    const cOffY = (rootH - cH) / 2;  // letterbox 上下偏移
 
-    // 圖片內的像素位置
-    const localX = offX + pos.x * dispW;
-    const localY = offY + pos.y * dispH;
+    // Step 2: 把 pos(0~1) 對應到 contain 的螢幕座標
+    const containX = cOffX + pos.x * cW;
+    const containY = cOffY + pos.y * cH;
 
-    // 加上 zoom/pan transform（從容器中心展開）
-    const imgX = rootW/2 + (localX - rootW/2 + tx) * 1 + (localX - rootW/2) * (scale - 1);
-    const imgY = rootH/2 + (localY - rootH/2 + ty) * 1 + (localY - rootH/2) * (scale - 1);
+    // Step 3: cover 的顯示區域
+    const vScale = Math.max(rootW / natW, rootH / natH);
+    const vW = natW * vScale;
+    const vH = natH * vScale;
+    const vOffX = (rootW - vW) / 2;  // 負值=被裁切
+    const vOffY = (rootH - vH) / 2;
 
-    // 簡化：zoom 是從中心點 scale，所以
-    // screenX = rootW/2 + (localX - rootW/2)*scale + tx
+    // Step 4: 把 contain 螢幕座標 → 圖片原始比例 → cover 螢幕座標
+    // 圖片原始比例（contain 座標扣掉 letterbox 再除以顯示尺寸）
+    const normX = (containX - cOffX) / cW;  // = pos.x
+    const normY = (containY - cOffY) / cH;  // = pos.y
+    // cover 螢幕座標
+    const localX = vOffX + normX * vW;
+    const localY = vOffY + normY * vH;
+
+    // Step 5: 加上 zoom/pan（從容器中心展開）
     const screenX = rootW/2 + (localX - rootW/2) * scale + tx;
     const screenY = rootH/2 + (localY - rootH/2) * scale + ty;
 
