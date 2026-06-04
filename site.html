@@ -329,6 +329,7 @@ header{
   display:grid;
   grid-template-columns:1.6fr 1fr;
   gap:12px;
+  align-items:stretch;
 }
 .stats-bar-row{
   display:flex;
@@ -376,20 +377,19 @@ header{
 }
 table.s-heat{border-collapse:collapse;width:100%}
 table.s-heat th{
-  color:#64748B;
+  color:#475569;font-weight:500;
   font-size:10px;
   font-weight:400;
   padding:3px 4px;
   text-align:center;
 }
 table.s-heat td{
-  padding:3px 4px;
+  padding:6px 4px;
   text-align:center;
   border-radius:3px;
   cursor:pointer;
-  font-size:10px;
+  font-size:11px;
   width:46px;
-  height:24px;
 }
 .rank-list-s{list-style:none;display:flex;flex-direction:column;gap:7px}
 .rank-item-s{display:flex;align-items:center;gap:8px;font-size:12px}
@@ -400,7 +400,7 @@ table.s-heat td{
 .rank-xp-s{font-size:11px;color:#64748B;min-width:40px;text-align:right}
 .donut-wrap-s{display:flex;align-items:center;justify-content:center;gap:14px}
 .donut-legs-s{display:flex;flex-direction:column;gap:3px;flex:1}
-.donut-leg-s{font-size:10px;color:#475569;display:flex;align-items:center;gap:4px}
+.donut-leg-s{font-size:11px;color:#334155;display:flex;align-items:center;gap:4px}
 </style>
 </head>
 <body>
@@ -1082,10 +1082,10 @@ window.addEventListener('resize', () => { buildMapLabels(); });
     <div style="margin-bottom:20px">
       <div class="stats-section-label">分布分析</div>
       <div class="stats-charts-row">
-        <div class="stats-card">
+        <div class="stats-card" style="display:flex;flex-direction:column">
           <div class="stats-card-title">毛色分布</div>
-          <div class="donut-wrap-s">
-            <canvas id="s-donut" role="img" aria-label="毛色分布" width="90" height="90"></canvas>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:16px;min-height:0">
+            <canvas id="s-donut" role="img" aria-label="毛色分布" width="120" height="120"></canvas>
             <div class="donut-legs-s" id="s-donut-leg"></div>
           </div>
         </div>
@@ -1103,10 +1103,10 @@ window.addEventListener('resize', () => { buildMapLabels(); });
     <div>
       <div class="stats-section-label">深度分析</div>
       <div class="stats-bottom-row">
-        <div class="stats-card" style="position:relative">
+        <div class="stats-card" style="position:relative;display:flex;flex-direction:column;height:100%">
           <div class="stats-card-title">毛色 × 姿勢 熱力圖</div>
-          <div style="overflow-x:auto">
-            <table class="s-heat" id="s-heat" aria-label="毛色姿勢熱力圖"></table>
+          <div style="flex:1;overflow:auto">
+            <table class="s-heat" id="s-heat" aria-label="毛色姿勢熱力圖" style="width:100%;height:100%"></table>
           </div>
           <div class="heat-tip" id="s-tip"></div>
         </div>
@@ -1201,12 +1201,12 @@ function initStatsPage(data) {
   poses.forEach(p=>{ thead+=`<th>${p.replace('坐著發呆','坐呆').replace('蜷縮躺覺','蜷縮').replace('走動中','走動')}</th>`; });
   thead+='</tr>'; tbl.innerHTML=thead;
   colors.forEach(cat=>{
-    let row=`<tr><td style="text-align:right;padding-right:6px;color:rgba(255,255,255,.45);font-size:10px;white-space:nowrap">${cat}</td>`;
+    let row=`<tr><td style="text-align:right;padding-right:6px;color:#334155;font-size:11px;white-space:nowrap">${cat}</td>`;
     poses.forEach(p=>{
       const v=hmap[cat][p]||0;
       const a=v===0?0:0.15+0.75*(v/maxH);
       const bg=`rgba(59,130,246,${a.toFixed(2)})`;
-      const tc=a>0.5?'#fff':'rgba(255,255,255,.6)';
+      const tc=a>0.5?'#fff':'#334155';
       row+=`<td style="background:${bg};color:${tc}" onmouseenter="showHTip(event,'${cat}','${p}',${v})" onmouseleave="hideHTip()">${v||''}</td>`;
     });
     row+='</tr>'; tbl.innerHTML+=row;
