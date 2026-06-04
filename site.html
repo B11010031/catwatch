@@ -297,7 +297,7 @@ header{
     <div id="map-stats">
       <div class="m-stat">🔵 台北市 12 區 ＋ 🟢 新北市 29 區</div>
       <div class="m-stat">📋 總回報 <strong id="stat-total">—</strong></div>
-      <div class="m-stat">🐈 個體數 <strong>242 隻</strong></div>
+      <div class="m-stat">🐈 個體數 <strong id="stat-cats">—</strong></div>
     </div>
 
     <div id="map-tip">
@@ -481,7 +481,7 @@ const MAP_POSITIONS = {
   '石碇區': { x: 0.506, y: 0.5969 },
   '深坑區': { x: 0.4959, y: 0.5078 },
   '汐止區': { x: 0.5147, y: 0.431 },
-  '烏來區': { x: 0.4296, y: 0.7327 },
+  '烏來區': { x: 0.4296, y: 0.750 },
   '三峽區': { x: 0.3395, y: 0.6414 },
   '樹林區': { x: 0.333, y: 0.5345 },
   '鶯歌區': { x: 0.2926, y: 0.5546 },
@@ -501,7 +501,7 @@ const MAP_POSITIONS = {
   '土城區': { x: 0.3763, y: 0.5568 },
   '永和區': { x: 0.4253, y: 0.4955 },
   '中和區': { x: 0.4137, y: 0.5245 },
-  '新莊區': { x: 0.3618, y: 0.4744 },
+  '新莊區': { x: 0.3618, y: 0.460 },
   '板橋區': { x: 0.3806, y: 0.4967 },
   '三重區': { x: 0.3972, y: 0.4443 },
   '蘆洲區': { x: 0.3921, y: 0.4076 },
@@ -816,6 +816,7 @@ async function loadStats() {
 
     // 更新總回報數
     document.getElementById('stat-total').textContent = data.total + ' 筆';
+    if (data.totalCats) document.getElementById('stat-cats').textContent = data.totalCats + ' 隻';
 
     // 把 API 回傳的各區統計合併進 DD
     Object.entries(data.districts).forEach(([name, s]) => {
