@@ -1155,26 +1155,21 @@ function initStatsPage(data) {
 
   // Donut
   const cSorted = Object.entries(colorCnt).sort((a,b)=>b[1]-a[1]);
-  const cTop6 = cSorted.slice(0,6);
-  const cOtherVal = cSorted.slice(6).reduce((s,[,v])=>s+v,0);
-  const cArr = cOtherVal > 0 ? [...cTop6, ['其他', cOtherVal]] : cTop6;
-  const cTotal = cArr.reduce((s,[,v])=>s+v,0);
-  const cBgs = [...cTop6.map(([k])=>CMAP[k]||'#64748B'), '#CBD5E1'];
+  const cTotal = cSorted.reduce((s,[,v])=>s+v,0);
+  const cBgs = cSorted.map(([k])=>CMAP[k]||'#CBD5E1');
   if(window.sDonutChart) window.sDonutChart.destroy();
   window.sDonutChart = new Chart(document.getElementById('s-donut'),{
     type:'doughnut',
     data:{
-      labels:cArr.map(([k])=>k),
-      datasets:[{data:cArr.map(([,v])=>v),backgroundColor:cBgs,borderWidth:2,borderColor:'#fff'}]
+      labels:cSorted.map(([k])=>k),
+      datasets:[{data:cSorted.map(([,v])=>v),backgroundColor:cBgs,borderWidth:2,borderColor:'#fff'}]
     },
-    options:{responsive:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}筆`}}}}
+    options:{responsive:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}筆 (${Math.round(c.raw/cTotal*100)}%)`}}}}
   });
   const dleg=document.getElementById('s-donut-leg');
   dleg.innerHTML='';
-  // 圖例顯示全部顏色（包含其他裡面的細項）
-  cSorted.forEach(([k,v])=>{
-    const bg = CMAP[k]||'#CBD5E1';
-    dleg.innerHTML+=`<div class="donut-leg-s"><span style="width:9px;height:9px;border-radius:2px;background:${bg};display:inline-block;flex-shrink:0"></span>${k} ${Math.round(v/cTotal*100)}%</div>`;
+  cSorted.forEach(([k,v],i)=>{
+    dleg.innerHTML+=`<div class="donut-leg-s"><span style="width:9px;height:9px;border-radius:2px;background:${cBgs[i]};display:inline-block;flex-shrink:0"></span>${k} ${Math.round(v/cTotal*100)}%</div>`;
   });
 
   // Bars helper
