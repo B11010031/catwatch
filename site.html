@@ -764,19 +764,8 @@ async function loadStats() {
       });
     }
 
-    // 重新渲染地圖顏色（D3 已經畫好，只需更新填色）
-    if (window._mapPath && window._mapFeatures) {
-      d3.selectAll('.d-path').each(function() {
-        const name = this.dataset.name;
-        if (!name) return;
-        // 重新填色
-        d3.select(this).select('rect').attr('fill', distFill(name));
-        // 更新 count bubble
-      });
-      // 重新畫 label & bubble（最簡單的方式：重新觸發一次 map render）
-      d3.select('#label-layer').selectAll('*').remove();
-      redrawLabels(window._mapPath, window._mapFeatures);
-    }
+    // 重新渲染地圖標籤
+    if (window._rebuildMapLabels) window._rebuildMapLabels();
 
     // 重新渲染地圖標籤
     if (window._rebuildMapLabels) window._rebuildMapLabels();
