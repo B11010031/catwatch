@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>貓步漫遊 · 街貓資料站</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -249,7 +247,7 @@ header{
 <!-- MAP PAGE -->
 <div id="page-map" class="page active">
   <div id="map-root">
-    <img id="map-img" src="/public/cat_map.png" alt="台北貓版圖" draggable="false">
+    <img id="map-img" src="/public/cat_map.webp" alt="台北貓版圖" draggable="false">
     <div id="map-labels"></div>
 
     <div id="map-loading">
@@ -439,6 +437,11 @@ function showPage(id, btn){
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   btn.classList.add('active');
+  // hide map loading if switching to map
+  if(id==='map'){
+    const ml=document.getElementById('map-loading');
+    if(ml) ml.style.display='none';
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -535,6 +538,9 @@ function buildMapLabels() {
 }
 
 buildMapLabels();
+// 立即隱藏 loading
+const _ml = document.getElementById('map-loading');
+if (_ml) _ml.style.display = 'none';
 
 // re-build when data loads
 window._rebuildMapLabels = buildMapLabels;
