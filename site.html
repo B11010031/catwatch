@@ -248,8 +248,8 @@ header{
 /* ── 街貓圖鑑頁 ─────────────────────────────────────── */
 #page-stats{
   position:relative;
-  overflow-y:auto;
-  min-height:100%;
+  overflow:hidden;
+  height:100%;
   background:#0a1628;
 }
 #stats-bg{
@@ -276,32 +276,32 @@ header{
   margin-bottom:20px;
 }
 .stats-metric{
-  background:rgba(15,25,50,0.82);
+  background:rgba(255,255,255,0.92);
   backdrop-filter:blur(8px);
-  border:0.5px solid rgba(255,255,255,.12);
+  border:0.5px solid rgba(255,255,255,.6);
   border-radius:var(--r-lg);
   padding:16px 18px;
 }
 .stats-metric-val{
   font-size:28px;
   font-weight:700;
-  color:white;
+  color:#1B3A6B;
   line-height:1.1;
 }
 .stats-metric-lbl{
   font-size:12px;
-  color:rgba(255,255,255,.55);
+  color:#334155;
   margin-top:4px;
 }
 .stats-metric-sub{
   font-size:11px;
-  color:rgba(255,255,255,.35);
+  color:#64748B;
   margin-top:2px;
 }
 .stats-section-label{
   font-size:11px;
   font-weight:600;
-  color:rgba(255,255,255,.4);
+  color:rgba(255,255,255,.7);
   letter-spacing:.1em;
   text-transform:uppercase;
   margin-bottom:10px;
@@ -313,16 +313,16 @@ header{
   margin-bottom:20px;
 }
 .stats-card{
-  background:rgba(15,25,50,0.82);
+  background:rgba(255,255,255,0.92);
   backdrop-filter:blur(8px);
-  border:0.5px solid rgba(255,255,255,.12);
+  border:0.5px solid rgba(255,255,255,.6);
   border-radius:var(--r-lg);
   padding:16px;
 }
 .stats-card-title{
   font-size:13px;
   font-weight:600;
-  color:rgba(255,255,255,.85);
+  color:#1B3A6B;
   margin-bottom:12px;
 }
 .stats-bottom-row{
@@ -338,7 +338,7 @@ header{
 }
 .stats-bar-lbl{
   font-size:11px;
-  color:rgba(255,255,255,.55);
+  color:#475569;
   width:56px;
   text-align:right;
   white-space:nowrap;
@@ -348,7 +348,7 @@ header{
 .stats-bar-bg{
   flex:1;
   height:7px;
-  background:rgba(255,255,255,.08);
+  background:#E2E8F0;
   border-radius:4px;
   overflow:hidden;
 }
@@ -358,13 +358,13 @@ header{
 }
 .stats-bar-val{
   font-size:11px;
-  color:rgba(255,255,255,.4);
+  color:#94A3B8;
   min-width:22px;
   text-align:right;
 }
 .heat-tip{
   position:fixed;
-  background:rgba(10,22,40,0.95);
+  background:rgba(15,25,50,0.92);
   border:0.5px solid rgba(255,255,255,.2);
   border-radius:6px;
   padding:6px 10px;
@@ -376,7 +376,7 @@ header{
 }
 table.s-heat{border-collapse:collapse;width:100%}
 table.s-heat th{
-  color:rgba(255,255,255,.4);
+  color:#64748B;
   font-size:10px;
   font-weight:400;
   padding:3px 4px;
@@ -393,14 +393,14 @@ table.s-heat td{
 }
 .rank-list-s{list-style:none;display:flex;flex-direction:column;gap:7px}
 .rank-item-s{display:flex;align-items:center;gap:8px;font-size:12px}
-.rank-no-s{font-size:11px;color:rgba(255,255,255,.3);width:16px;text-align:right}
-.rank-name-s{flex:1;color:rgba(255,255,255,.8)}
-.rank-bar-wrap-s{width:70px;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+.rank-no-s{font-size:11px;color:#94A3B8;width:16px;text-align:right}
+.rank-name-s{flex:1;color:#1e293b}
+.rank-bar-wrap-s{width:70px;height:5px;background:#E2E8F0;border-radius:3px;overflow:hidden}
 .rank-bar-s{height:5px;border-radius:3px;background:#3B82F6}
-.rank-xp-s{font-size:11px;color:rgba(255,255,255,.4);min-width:40px;text-align:right}
-.donut-wrap-s{display:flex;align-items:center;gap:10px}
+.rank-xp-s{font-size:11px;color:#64748B;min-width:40px;text-align:right}
+.donut-wrap-s{display:flex;align-items:center;justify-content:center;gap:14px}
 .donut-legs-s{display:flex;flex-direction:column;gap:3px;flex:1}
-.donut-leg-s{font-size:10px;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:4px}
+.donut-leg-s{font-size:10px;color:#475569;display:flex;align-items:center;gap:4px}
 </style>
 </head>
 <body>
@@ -1153,7 +1153,7 @@ function initStatsPage(data) {
     type:'doughnut',
     data:{
       labels:cArr.map(([k])=>k),
-      datasets:[{data:cArr.map(([,v])=>v),backgroundColor:cArr.map(([k])=>CMAP[k]||'#64748B'),borderWidth:1,borderColor:'rgba(0,0,0,.3)'}]
+      datasets:[{data:cArr.map(([,v])=>v),backgroundColor:cArr.map(([k])=>CMAP[k]||'#64748B'),borderWidth:1,borderColor:'rgba(255,255,255,.8)'}]
     },
     options:{responsive:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}筆`}}}}
   });
