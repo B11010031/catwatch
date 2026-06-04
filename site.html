@@ -71,7 +71,7 @@ header{
 }
 #map-img{
   width:100%;height:100%;
-  object-fit:cover;
+  object-fit:contain;
   display:block;
   pointer-events:none;
   user-select:none;
@@ -597,11 +597,32 @@ function buildMapLabels() {
     // map-zoom 的 transform = translate(tx,ty) scale(scale)
     const rootW = mapRoot.offsetWidth;
     const rootH = mapRoot.offsetHeight;
-    const imgX = rootW/2 + tx + (pos.x - 0.5) * rootW * scale;
-    const imgY = rootH/2 + ty + (pos.y - 0.5) * rootH * scale;
-    el.style.left = imgX + 'px';
-    el.style.top  = imgY + 'px';
-    // 字體大小：隨縮放調整但有上下限
+    const img = document.getElementById('map-img');
+    const natW = img.naturalWidth  || 1600;
+    const natH = img.naturalHeight || 900;
+
+    // object-fit:contain 的實際顯示尺寸（letterbox）
+    const fitScale = Math.min(rootW / natW, rootH / natH);
+    const dispW = natW * fitScale;
+    const dispH = natH * fitScale;
+    const offX  = (rootW - dispW) / 2;
+    const offY  = (rootH - dispH) / 2;
+
+    // 圖片內的像素位置
+    const localX = offX + pos.x * dispW;
+    const localY = offY + pos.y * dispH;
+
+    // 加上 zoom/pan transform（從容器中心展開）
+    const imgX = rootW/2 + (localX - rootW/2 + tx) * 1 + (localX - rootW/2) * (scale - 1);
+    const imgY = rootH/2 + (localY - rootH/2 + ty) * 1 + (localY - rootH/2) * (scale - 1);
+
+    // 簡化：zoom 是從中心點 scale，所以
+    // screenX = rootW/2 + (localX - rootW/2)*scale + tx
+    const screenX = rootW/2 + (localX - rootW/2) * scale + tx;
+    const screenY = rootH/2 + (localY - rootH/2) * scale + ty;
+
+    el.style.left = screenX + 'px';
+    el.style.top  = screenY + 'px';
     const fontSize = Math.min(13, Math.max(9, 10 * Math.sqrt(scale)));
     el.style.setProperty('--label-fs', fontSize + 'px');
     el.style.transform = 'translate(-50%,-50%)';
