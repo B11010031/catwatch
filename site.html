@@ -90,9 +90,7 @@ header{
   transform:translate(-50%,-50%);
   display:flex;flex-direction:column;align-items:center;gap:2px;
   pointer-events:all;cursor:pointer;
-  transition:transform .12s;
 }
-.map-label:hover{ transform:translate(-50%,-50%) scale(1.2); }
 .map-label:hover .ml-name{ background:rgba(27,58,107,.85); }
 .ml-name{
   font-size:10px;font-weight:700;
@@ -430,11 +428,18 @@ document.getElementById('stat-total').textContent = TOTAL+' 筆';
 
 // 顏色設定
 const COLORS = {
-  '黑貓':   { hex:'#1E293B', light:'#F1F5F9', emoji:'🐈‍⬛' },
-  '虎斑貓': { hex:'#F97316', light:'#FEF3C7', emoji:'🐈' },
-  '三花貓': { hex:'#F59E0B', light:'#FEF9C3', emoji:'🐱' },
-  '橘貓':   { hex:'#FB923C', light:'#FFF7ED', emoji:'😺' },
-  '白貓':   { hex:'#94A3B8', light:'#F8FAFC', emoji:'🐾' },
+  '黑貓':     { hex:'#1E293B', light:'#F1F5F9', emoji:'🐈‍⬛' },
+  '虎斑貓':   { hex:'#92400E', light:'#FEF3C7', emoji:'🐈' },
+  '三花貓':   { hex:'#F59E0B', light:'#FEF9C3', emoji:'🐱' },
+  '橘貓':     { hex:'#FB923C', light:'#FFF7ED', emoji:'😺' },
+  '白貓':     { hex:'#94A3B8', light:'#F8FAFC', emoji:'🐾' },
+  '灰貓':     { hex:'#64748B', light:'#F1F5F9', emoji:'🐱' },
+  '橘白貓':   { hex:'#F97316', light:'#FFF7ED', emoji:'🐈' },
+  '賓士貓':   { hex:'#334155', light:'#F8FAFC', emoji:'🐈‍⬛' },
+  '白底虎斑': { hex:'#A16207', light:'#FEFCE8', emoji:'🐈' },
+  '棕白貓':   { hex:'#78350F', light:'#FEF3C7', emoji:'🐱' },
+  '玳瑁貓':   { hex:'#92400E', light:'#FEF9C3', emoji:'😸' },
+  'all':      { hex:'#1B3A6B', light:'#DBEAFE', emoji:'🐾' },
 };
 
 const POSE_DESC = {
@@ -523,6 +528,12 @@ let dragging = false, dx = 0, dy = 0, dtx = 0, dty = 0;
 
 function applyT() {
   mapZoom.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  // 更新標籤反向縮放
+  document.querySelectorAll('.map-label').forEach(el => {
+    const labelScale = Math.max(0.5, 1 / scale);
+    const cur = el.style.transform;
+    el.style.transform = cur.replace(/scale\([^)]+\)/, `scale(${labelScale})`);
+  });
 }
 
 // 滾輪縮放（最小 scale = 1，不露出空白）
@@ -585,11 +596,11 @@ function buildMapLabels() {
     const el = document.createElement('div');
     el.className = 'map-label' + (hasData ? ' has-data' : '');
     el.dataset.name = name;
-    // 直接用 % 定位，#map-labels 是 #map-zoom 的 inset:0 子元素
-    // #map-zoom 裡 img 是 object-fit:cover 100%x100%
-    // 所以 % 座標直接對應圖片比例位置
     el.style.left = (pos.x * 100) + '%';
     el.style.top  = (pos.y * 100) + '%';
+    // 反向縮放：地圖放大時標籤縮小，讓標籤在視覺上保持固定大小
+    const labelScale = Math.max(0.5, 1 / scale);
+    el.style.transform = `translate(-50%,-50%) scale(${labelScale})`;
 
     if (hasData) {
       el.innerHTML = `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`;
@@ -705,16 +716,17 @@ function renderPC(){
   const list = activeColor==='all' ? POSTCARDS : POSTCARDS.filter(p=>p.color===activeColor);
   const col  = COLORS[activeColor];
   document.getElementById('pc-grid').innerHTML = list.map(p=>{
-    const c = COLORS[p.color]||{hex:'#94A3B8',light:'#F1F5F9',emoji:'🐱'};
+    const c = COLORS[p.colorZh]||COLORS[p.color]||{hex:'#94A3B8',light:'#F1F5F9',emoji:'🐱'};
+    // 自動推算圖片路徑
+    const imgSrc = p.img || `/public/postcards/${p.color}.jpg`;
     return `<div class="pc-card" onclick="openLb(${p.id})">
       <div class="pc-scene" style="background:${c.light}">
-        ${p.img
-          ? `<img src="${p.img}" alt="${p.color}·${p.env}" loading="lazy">`
-          : `<div class="pc-placeholder">
-              <div class="pc-ph-emoji">${c.emoji}</div>
-              <div class="pc-ph-text">執行生成腳本後顯示圖片</div>
-              <div class="pc-ph-sub">node generate.mjs</div>
-            </div>`}
+        <img src="${imgSrc}" alt="${p.colorZh||p.color}" loading="lazy"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="pc-placeholder" style="display:none">
+          <div class="pc-ph-emoji">${c.emoji}</div>
+          <div class="pc-ph-text">圖片載入中...</div>
+        </div>
         <div class="pc-tag">📍 ${p.district}</div>
       </div>
       <div class="pc-info">
@@ -724,8 +736,8 @@ function renderPC(){
         </div>
         <div class="pc-meta">共 ${p.count} 筆回報</div>
         <div class="pc-tags">
-          <span class="badge" style="background:${c.light};color:${c.hex}">${p.colorZh}</span>
-          <span class="badge bd-navy">${p.district}</span>
+          ${p.colorZh ? `<span class="badge" style="background:${c.light};color:${c.hex}">${p.colorZh}</span>` : ''}
+          ${p.district ? `<span class="badge bd-navy">${p.district}</span>` : ''}
         </div>
       </div>
       <div class="pc-acts">
@@ -742,7 +754,7 @@ function openLb(id){
   document.getElementById('lb-img').src = p.img||'';
   document.getElementById('lb-img').style.display = p.img?'block':'none';
   document.getElementById('lb-img-wrap').style.background = c.light||'var(--blue-light)';
-  document.getElementById('lb-title').textContent = `${p.colorZh} · ${p.district}`;
+  document.getElementById('lb-title').textContent = `${p.colorZh||p.color} · ${p.district}`;
   document.getElementById('lb-sub').textContent   = `共 ${p.count} 筆回報`;
   // prompt removed
   document.getElementById('lb').classList.add('show');
