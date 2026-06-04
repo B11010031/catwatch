@@ -79,19 +79,21 @@ header{
 #map-labels{
   position:absolute;
   inset:0;
-  pointer-events:none;  /* container: passthrough */
+  pointer-events:none;
+  z-index:10;
 }
-/* label children get pointer events */
 #map-labels .map-label{
-  pointer-events:all !important;
+  pointer-events:all;
 }
 .map-label{
   position:absolute;
   transform:translate(-50%,-50%);
   display:flex;flex-direction:column;align-items:center;gap:2px;
   pointer-events:all;cursor:pointer;
+  transition:transform .12s;
 }
-.map-label:hover .ml-name{ background:rgba(27,58,107,.75); }
+.map-label:hover{ transform:translate(-50%,-50%) scale(1.2); }
+.map-label:hover .ml-name{ background:rgba(27,58,107,.85); }
 .ml-name{
   font-size:10px;font-weight:700;
   color:white;
@@ -266,8 +268,9 @@ header{
   <div id="map-root">
     <div id="map-zoom">
       <img id="map-img" src="/public/cat_map.webp" alt="台北貓版圖" draggable="false">
-      <div id="map-labels"></div>
     </div>
+    <!-- labels outside zoom container, positioned relative to mapRoot -->
+    <div id="map-labels"></div>
 
     <div id="map-loading">
       <div class="spin"></div>
@@ -513,6 +516,31 @@ const MAP_POSITIONS = {
   '大安區': { x: 0.4469, y: 0.4866 },
 };
 
+// ── 計算圖片在容器內的實際顯示區域 ─────────────────────
+// object-fit:cover 會等比縮放並裁切
+function getImgRect() {
+  const img  = document.getElementById('map-img');
+  const root = mapRoot.getBoundingClientRect();
+  const rW = root.width, rH = root.height;
+  const iW = img.naturalWidth  || 1600;
+  const iH = img.naturalHeight || 900;
+  const scale_c = Math.max(rW / iW, rH / iH);  // cover scale
+  const dW = iW * scale_c;
+  const dH = iH * scale_c;
+  const offX = (rW - dW) / 2;
+  const offY = (rH - dH) / 2;
+  return { offX, offY, dW, dH };
+}
+
+function placeLabel(el, pos) {
+  const { offX, offY, dW, dH } = getImgRect();
+  // pos.x/y 是相對於圖片本身的比例
+  const x = offX + pos.x * dW;
+  const y = offY + pos.y * dH;
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+}
+
 function buildMapLabels() {
   const container = document.getElementById('map-labels');
   container.innerHTML = '';
@@ -523,9 +551,8 @@ function buildMapLabels() {
 
     const el = document.createElement('div');
     el.className = 'map-label' + (hasData ? ' has-data' : '');
-    // 直接用百分比定位，相對於 #map-labels (= #map-zoom 內的 inset:0)
-    el.style.left = (pos.x * 100) + '%';
-    el.style.top  = (pos.y * 100) + '%';
+    el.dataset.name = name;
+    placeLabel(el, pos);
 
     if (hasData) {
       el.innerHTML = `<div class="ml-name">${name}</div><div class="ml-count">${dd.count}</div>`;
@@ -533,21 +560,18 @@ function buildMapLabels() {
       el.innerHTML = `<div class="ml-name dim">${name}</div>`;
     }
 
-    // ── tooltip ──────────────────────────────────
-    el.addEventListener('mouseenter', function(e) {
+    el.addEventListener('mouseenter', function() {
       const topC = Object.entries(dd.colors||{}).sort((a,b)=>b[1]-a[1])[0];
       const tip  = document.getElementById('map-tip');
       const root = mapRoot.getBoundingClientRect();
       const r    = el.getBoundingClientRect();
-
       document.getElementById('tt-name').textContent  = name;
       document.getElementById('tt-count').textContent = (dd.count||0) + ' 筆';
       document.getElementById('tt-color').textContent = topC ? topC[0] : '—';
       document.getElementById('tt-pose').textContent  = (dd.poses||[])[0] || '—';
-
       let tipX = r.right - root.left + 8;
-      let tipY = r.top   - root.top  - 10;
-      if (tipX + 200 > root.width)  tipX = r.left - root.left - 210;
+      let tipY = r.top - root.top - 10;
+      if (tipX + 200 > root.width) tipX = r.left - root.left - 210;
       if (tipY < 8) tipY = 8;
       tip.style.left = tipX + 'px';
       tip.style.top  = tipY + 'px';
@@ -566,21 +590,29 @@ function buildMapLabels() {
   });
 }
 
+// 視窗大小改變時重新計算位置
+window.addEventListener('resize', buildMapLabels);
+
 window._rebuildMapLabels = buildMapLabels;
 
-// 初始化標籤
-buildMapLabels();
-// 隱藏 loading
+// 初始化（等圖片載入後再算位置）
+const _mapImg = document.getElementById('map-img');
+if (_mapImg.complete) {
+  buildMapLabels();
+} else {
+  _mapImg.addEventListener('load', buildMapLabels);
+}
+
 const _ml = document.getElementById('map-loading');
 if (_ml) _ml.style.display = 'none';
 
-document.getElementById('map-root').addEventListener('click', () => {
+mapRoot.addEventListener('click', () => {
   document.getElementById('side-panel').classList.remove('open');
 });
 
-function zoomIn()    { scale = Math.min(10, scale*1.4); applyT(); }
-function zoomOut()   { scale = Math.max(0.5, scale*0.7); applyT(); }
-function zoomReset() { scale=1; tx=0; ty=0; applyT(); }
+function zoomIn()    { scale = Math.min(10, scale*1.4); applyT(); buildMapLabels(); }
+function zoomOut()   { scale = Math.max(0.5, scale*0.7); applyT(); buildMapLabels(); }
+function zoomReset() { scale=1; tx=0; ty=0; applyT(); buildMapLabels(); }
 
 /* ═══════════════════════════════════════
    POSTCARDS — 顏色分類
