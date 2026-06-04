@@ -688,6 +688,7 @@ function buildColorTabs(){
   const counts = {};
   POSTCARDS.forEach(p=>{ counts[p.color]=(counts[p.color]||0)+1; });
   const row = document.getElementById('color-tabs');
+  if (!row) return; // color-tabs 已移除
   colorOrder.forEach(c=>{
     if(c!=='all' && !counts[c]) return;
     const btn = document.createElement('button');
@@ -815,11 +816,7 @@ async function loadStats() {
 
     // 重新渲染地圖標籤
     if (window._rebuildMapLabels) window._rebuildMapLabels();
-
-    // 重新渲染地圖標籤
-    if (window._rebuildMapLabels) window._rebuildMapLabels();
     // 重新渲染明信片
-    buildColorTabs();
     renderPC();
 
     console.log('✅ 數據載入完成', data.total, '筆回報');
@@ -827,7 +824,6 @@ async function loadStats() {
   } catch (err) {
     console.warn('API 載入失敗，使用預設資料:', err.message);
     // fallback: 用 DD 裡的預設資料
-    buildColorTabs();
     renderPC();
   }
 }
