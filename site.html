@@ -50,7 +50,7 @@ header{
 /* ── PAGES ── */
 .page{display:none;position:fixed;inset:60px 0 0 0;overflow:hidden}
 .page.active{display:block}
-#page-stats{overflow-y:auto !important;}
+
 
 /* ══════════════════════
    MAP PAGE
@@ -1055,9 +1055,9 @@ window.addEventListener('resize', () => { buildMapLabels(); });
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
 <!-- STATS PAGE -->
-<div id="page-stats" class="page">
+<div id="page-stats" class="page" style="overflow-y:auto;">
   <div id="stats-bg"></div>
-  <div class="stats-content">
+  <div class="stats-content" style="padding-bottom:60px;">
 
     <div style="margin-bottom:20px">
       <div class="stats-section-label">總覽</div>
